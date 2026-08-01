@@ -1,5 +1,5 @@
 ---
-import { Braces, Image as ImageIcon, Network } from "@lucide/astro";
+import { Braces, FileOutput, Image as ImageIcon, Network } from "@lucide/astro";
 import ToolLink from "../../components/ToolLink.astro";
 import BaseLayout from "../../layouts/BaseLayout.astro";
 ---
@@ -27,6 +27,12 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
       description="本地完成图片裁切、缩放与格式转换。"
       icon={ImageIcon}
     />
+    <ToolLink
+      href="/tools/convert/"
+      title="标记语言转换"
+      description="在 Markdown、HTML、Typst 与 LaTeX 之间转换。"
+      icon={FileOutput}
+    />
   </div>
 </BaseLayout>
 
@@ -37,7 +43,7 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
 
   .tool-grid {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 14px;
   }
 

@@ -1,0 +1,472 @@
+---
+import {
+  ArrowLeftRight,
+  Clipboard,
+  Download,
+  Play,
+  Trash2,
+  Upload,
+} from "@lucide/astro";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+---
+
+<BaseLayout
+  title="标记语言转换"
+  description="在 Markdown、HTML、Typst 与 LaTeX 之间进行本地转换。"
+  wide
+>
+  <header class="tool-header">
+    <p class="eyebrow">Tools / Convert</p>
+    <h1>标记语言转换</h1>
+    <p class="lede">Markdown、HTML、Typst 与 LaTeX。</p>
+  </header>
+
+  <div class="format-toolbar">
+    <label class="field-label">
+      输入格式
+      <select class="select" id="source-format">
+        <option value="auto">自动识别</option>
+        <option value="markdown">Markdown</option>
+        <option value="html">HTML</option>
+        <option value="typst">Typst</option>
+        <option value="latex">LaTeX</option>
+      </select>
+    </label>
+    <button class="tool-button swap-button" id="swap-formats" type="button" title="交换格式" aria-label="交换输入与输出格式">
+      <ArrowLeftRight size={18} aria-hidden="true" />
+    </button>
+    <label class="field-label">
+      输出格式
+      <select class="select" id="target-format">
+        <option value="html">HTML</option>
+        <option value="markdown">Markdown</option>
+        <option value="typst">Typst</option>
+        <option value="latex">LaTeX</option>
+      </select>
+    </label>
+    <button class="tool-button primary convert-button" id="convert-document" type="button" disabled>
+      <Play size={17} aria-hidden="true" /> 转换
+    </button>
+  </div>
+
+  <div class="converter-status">
+    <p id="convert-status" class="status-line" aria-live="polite">正在载入转换器…</p>
+    <span>markweft-rs / WebAssembly</span>
+  </div>
+
+  <div class="editor-grid">
+    <section class="editor-panel">
+      <div class="panel-header">
+        <label for="document-input">输入</label>
+        <label class="panel-action" for="document-file">
+          <Upload size={15} aria-hidden="true" /> 导入
+          <input
+            id="document-file"
+            type="file"
+            accept=".md,.markdown,.html,.htm,.typ,.typst,.tex,.latex,text/*"
+          />
+        </label>
+      </div>
+      <textarea
+        class="textarea document-editor"
+        id="document-input"
+        spellcheck="false"
+        placeholder="# Hello&#10;&#10;Start writing here…"></textarea>
+      <div class="editor-footer">
+        <span id="input-characters">0 字符</span>
+        <button id="clear-document" type="button">
+          <Trash2 size={14} aria-hidden="true" /> 清空
+        </button>
+      </div>
+    </section>
+
+    <section class="editor-panel">
+      <div class="panel-header">
+        <label for="document-output">输出</label>
+        <div class="panel-actions">
+          <button id="copy-document" type="button" disabled>
+            <Clipboard size={15} aria-hidden="true" /> 复制
+          </button>
+          <button id="download-document" type="button" disabled>
+            <Download size={15} aria-hidden="true" /> 下载
+          </button>
+        </div>
+      </div>
+      <textarea
+        class="textarea document-editor"
+        id="document-output"
+        spellcheck="false"
+        readonly
+        placeholder="转换结果"></textarea>
+      <div class="editor-footer">
+        <span id="output-characters">0 字符</span>
+        <span id="detected-format"></span>
+      </div>
+    </section>
+  </div>
+</BaseLayout>
+
+<script>
+  type FormatName = "markdown" | "html" | "typst" | "latex";
+  type WorkerResponse =
+    | { type: "ready" }
+    | { type: "result"; id: number; output: string; detectedFormat: FormatName }
+    | { type: "error"; id?: number; message: string };
+
+  const formatLabels: Record<FormatName, string> = {
+    markdown: "Markdown",
+    html: "HTML",
+    typst: "Typst",
+    latex: "LaTeX",
+  };
+  const extensions: Record<FormatName, string> = {
+    markdown: "md",
+    html: "html",
+    typst: "typ",
+    latex: "tex",
+  };
+  const extensionFormats: Record<string, FormatName> = {
+    md: "markdown",
+    markdown: "markdown",
+    html: "html",
+    htm: "html",
+    typ: "typst",
+    typst: "typst",
+    tex: "latex",
+    latex: "latex",
+  };
+
+  const sourceFormat = document.querySelector<HTMLSelectElement>("#source-format");
+  const targetFormat = document.querySelector<HTMLSelectElement>("#target-format");
+  const input = document.querySelector<HTMLTextAreaElement>("#document-input");
+  const output = document.querySelector<HTMLTextAreaElement>("#document-output");
+  const status = document.querySelector<HTMLElement>("#convert-status");
+  const detected = document.querySelector<HTMLElement>("#detected-format");
+  const inputCharacters = document.querySelector<HTMLElement>("#input-characters");
+  const outputCharacters = document.querySelector<HTMLElement>("#output-characters");
+  const convertButton = document.querySelector<HTMLButtonElement>("#convert-document");
+  const copyButton = document.querySelector<HTMLButtonElement>("#copy-document");
+  const downloadButton = document.querySelector<HTMLButtonElement>("#download-document");
+  const fileInput = document.querySelector<HTMLInputElement>("#document-file");
+
+  const worker = new Worker(new URL("../../workers/markweft.worker.ts", import.meta.url), {
+    type: "module",
+  });
+  let ready = false;
+  let requestId = 0;
+  let lastDetected: FormatName | undefined;
+
+  function setStatus(message: string, state = "") {
+    if (!status) return;
+    status.textContent = message;
+    status.dataset.state = state;
+  }
+
+  function setOutput(value: string, detectedFormat?: FormatName) {
+    if (output) output.value = value;
+    if (outputCharacters) outputCharacters.textContent = `${value.length.toLocaleString()} 字符`;
+    if (copyButton) copyButton.disabled = !value;
+    if (downloadButton) downloadButton.disabled = !value;
+    if (detected) {
+      detected.textContent = detectedFormat ? `识别为 ${formatLabels[detectedFormat]}` : "";
+    }
+  }
+
+  function updateInputStats() {
+    const length = input?.value.length ?? 0;
+    if (inputCharacters) inputCharacters.textContent = `${length.toLocaleString()} 字符`;
+  }
+
+  function requestConversion() {
+    const source = input?.value ?? "";
+    if (!source.trim()) return setStatus("请输入需要转换的内容", "error");
+    if (!ready || !sourceFormat || !targetFormat || !convertButton) return;
+
+    requestId += 1;
+    convertButton.disabled = true;
+    setStatus("正在转换…");
+    worker.postMessage({
+      type: "convert",
+      id: requestId,
+      source,
+      from: sourceFormat.value,
+      to: targetFormat.value,
+    });
+  }
+
+  worker.addEventListener("message", ({ data }: MessageEvent<WorkerResponse>) => {
+    if (data.type === "ready") {
+      ready = true;
+      if (convertButton) convertButton.disabled = false;
+      setStatus("转换器已就绪", "success");
+      return;
+    }
+    if (data.type === "result" && data.id === requestId) {
+      lastDetected = data.detectedFormat;
+      setOutput(data.output, data.detectedFormat);
+      if (convertButton) convertButton.disabled = false;
+      setStatus("转换完成", "success");
+      return;
+    }
+    if (data.type === "error" && (data.id === undefined || data.id === requestId)) {
+      if (convertButton) convertButton.disabled = !ready;
+      setStatus(data.message || "转换失败", "error");
+    }
+  });
+
+  worker.addEventListener("error", () => {
+    if (convertButton) convertButton.disabled = true;
+    setStatus("无法载入转换器", "error");
+  });
+  worker.postMessage({ type: "init" });
+
+  document.querySelector("#convert-document")?.addEventListener("click", requestConversion);
+  input?.addEventListener("input", updateInputStats);
+  input?.addEventListener("keydown", (event) => {
+    if ((event.ctrlKey || event.metaKey) && event.key === "Enter") requestConversion();
+  });
+
+  document.querySelector("#swap-formats")?.addEventListener("click", () => {
+    if (!sourceFormat || !targetFormat) return;
+    const previousSource = sourceFormat.value === "auto"
+      ? (lastDetected ?? "markdown")
+      : sourceFormat.value;
+    sourceFormat.value = targetFormat.value;
+    targetFormat.value = previousSource;
+    if (output?.value && input) {
+      input.value = output.value;
+      updateInputStats();
+      setOutput("");
+    }
+    setStatus("格式已交换");
+  });
+
+  document.querySelector("#clear-document")?.addEventListener("click", () => {
+    if (input) input.value = "";
+    lastDetected = undefined;
+    updateInputStats();
+    setOutput("");
+    setStatus(ready ? "转换器已就绪" : "正在载入转换器…", ready ? "success" : "");
+    input?.focus();
+  });
+
+  fileInput?.addEventListener("change", async () => {
+    const file = fileInput.files?.[0];
+    if (!file || !input) return;
+    try {
+      input.value = await file.text();
+      const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
+      const format = extensionFormats[extension];
+      if (format && sourceFormat) sourceFormat.value = format;
+      updateInputStats();
+      setOutput("");
+      setStatus(`${file.name} 已导入`, "success");
+    } catch {
+      setStatus("无法读取这个文件", "error");
+    } finally {
+      fileInput.value = "";
+    }
+  });
+
+  copyButton?.addEventListener("click", async () => {
+    if (!output?.value) return;
+    try {
+      await navigator.clipboard.writeText(output.value);
+      setStatus("输出已复制", "success");
+    } catch {
+      setStatus("浏览器拒绝了剪贴板访问", "error");
+    }
+  });
+
+  downloadButton?.addEventListener("click", () => {
+    if (!output?.value || !targetFormat) return;
+    const format = targetFormat.value as FormatName;
+    const url = URL.createObjectURL(new Blob([output.value], { type: "text/plain;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `converted.${extensions[format]}`;
+    link.click();
+    URL.revokeObjectURL(url);
+    setStatus("下载已开始", "success");
+  });
+
+  updateInputStats();
+</script>
+
+<style>
+  .tool-header {
+    margin-bottom: 34px;
+  }
+
+  .format-toolbar {
+    display: grid;
+    grid-template-columns: minmax(160px, 1fr) 42px minmax(160px, 1fr) auto;
+    align-items: end;
+    gap: 10px;
+    padding: 18px;
+    border-block: 1px solid var(--border);
+    background: var(--surface);
+  }
+
+  .swap-button {
+    width: 42px;
+    padding: 0;
+  }
+
+  .convert-button {
+    height: 42px;
+  }
+
+  .converter-status {
+    display: flex;
+    min-height: 58px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+  }
+
+  .converter-status span {
+    color: var(--faint);
+    font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+    font-size: 0.7rem;
+  }
+
+  .editor-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .editor-panel {
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+  }
+
+  .panel-header,
+  .editor-footer {
+    display: flex;
+    min-height: 44px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding-inline: 13px;
+    color: var(--muted);
+    font-size: 0.76rem;
+  }
+
+  .panel-header {
+    border-bottom: 1px solid var(--border);
+    font-weight: 650;
+  }
+
+  .editor-footer {
+    min-height: 38px;
+    border-top: 1px solid var(--border);
+    color: var(--faint);
+    font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+    font-size: 0.68rem;
+  }
+
+  .panel-actions,
+  .panel-action,
+  .panel-header button,
+  .editor-footer button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .panel-actions {
+    gap: 4px;
+  }
+
+  .panel-action,
+  .panel-header button,
+  .editor-footer button {
+    padding: 5px 7px;
+    border: 0;
+    border-radius: 4px;
+    color: var(--muted);
+    background: transparent;
+    cursor: pointer;
+    font: inherit;
+  }
+
+  .panel-action:hover,
+  .panel-header button:hover:not(:disabled),
+  .editor-footer button:hover {
+    color: var(--text);
+    background: var(--surface-raised);
+  }
+
+  .panel-header button:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+
+  .panel-action input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+  }
+
+  .document-editor {
+    display: block;
+    min-height: 520px;
+    border: 0;
+    border-radius: 0;
+    background: #0e110f;
+    resize: vertical;
+  }
+
+  .document-editor:focus {
+    box-shadow: inset 0 0 0 1px var(--accent);
+  }
+
+  #document-output {
+    color: #d8dcd9;
+  }
+
+  @media (max-width: 760px) {
+    .format-toolbar {
+      grid-template-columns: minmax(0, 1fr) 42px minmax(0, 1fr);
+      padding: 14px;
+    }
+
+    .convert-button {
+      grid-column: 1 / -1;
+    }
+
+    .editor-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .document-editor {
+      min-height: 340px;
+    }
+  }
+
+  @media (max-width: 440px) {
+    .format-toolbar {
+      grid-template-columns: minmax(0, 1fr) 38px minmax(0, 1fr);
+      gap: 7px;
+      padding-inline: 10px;
+    }
+
+    .swap-button {
+      width: 38px;
+    }
+
+    .converter-status {
+      align-items: flex-start;
+      flex-direction: column;
+      justify-content: center;
+      gap: 0;
+    }
+  }
+</style>

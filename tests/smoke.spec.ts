@@ -10,6 +10,7 @@ const pages = [
   "/tools/dns/",
   "/tools/json/",
   "/tools/image/",
+  "/tools/convert/",
   "/about/",
 ];
 
@@ -64,6 +65,30 @@ test("image tool creates a local output", async ({ page }) => {
   await page.getByRole("button", { name: "生成图片" }).click();
   await expect(page.locator("#output-panel")).toBeVisible();
   await expect(page.locator("#download-image")).toHaveAttribute("download", /processed\.webp$/);
+});
+
+test("document converter runs the Rust Wasm format matrix", async ({ page }) => {
+  await page.goto("/tools/convert/");
+  await expect(page.locator("#convert-status")).toHaveText("转换器已就绪", {
+    timeout: 15_000,
+  });
+
+  const cases = [
+    ["markdown", "html", "# Hello", "<h1>Hello</h1>"],
+    ["html", "markdown", "<h1>Hello</h1>", "# Hello"],
+    ["typst", "latex", "= Hello", "\\section{Hello}"],
+    ["latex", "typst", "\\section{Hello}", "= Hello"],
+  ] as const;
+
+  for (const [from, to, source, expected] of cases) {
+    await page.locator("#source-format").selectOption(from);
+    await page.locator("#target-format").selectOption(to);
+    await page.locator("#document-input").fill(source);
+    await page.getByRole("button", { name: "转换", exact: true }).click();
+    await expect
+      .poll(() => page.locator("#document-output").inputValue())
+      .toContain(expected);
+  }
 });
 
 test("visual snapshots", async ({ page }) => {

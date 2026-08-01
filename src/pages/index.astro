@@ -1,6 +1,6 @@
 ---
 import { getCollection } from "astro:content";
-import { Braces, Image as ImageIcon, Network } from "@lucide/astro";
+import { Braces, FileOutput, Image as ImageIcon, Network } from "@lucide/astro";
 import ArticleList from "../components/ArticleList.astro";
 import ToolLink from "../components/ToolLink.astro";
 import BaseLayout from "../layouts/BaseLayout.astro";
@@ -63,6 +63,12 @@ const articles = sortArticles(
         description="在本地裁切、缩放和压缩图片。"
         icon={ImageIcon}
       />
+      <ToolLink
+        href="/tools/convert/"
+        title="标记语言转换"
+        description="转换 Markdown、HTML、Typst 与 LaTeX。"
+        icon={FileOutput}
+      />
     </div>
   </section>
 </BaseLayout>
@@ -118,7 +124,7 @@ const articles = sortArticles(
 
   .tool-grid {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 14px;
   }
 
