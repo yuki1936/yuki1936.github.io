@@ -1,0 +1,62 @@
+---
+import "../styles/global.css";
+import Header from "../components/Header.astro";
+
+interface Props {
+  title?: string;
+  description?: string;
+  wide?: boolean;
+}
+
+const {
+  title,
+  description = "yuki1936 的文章、回忆与日常工具。",
+  wide = false,
+} = Astro.props;
+const pageTitle = title ? `${title} · neri` : "neri";
+---
+
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content={description} />
+    <meta name="theme-color" content="#101211" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <title>{pageTitle}</title>
+  </head>
+  <body>
+    <Header />
+    <main class:list={["site-main", wide ? "shell" : "content-shell"]}>
+      <slot />
+    </main>
+    <footer class="site-footer shell">
+      <span>© {new Date().getFullYear()} yuki1936</span>
+      <span>立春天，风渐暖，伊人一去不复返。</span>
+    </footer>
+  </body>
+</html>
+
+<style>
+  .site-footer {
+    display: flex;
+    min-height: 72px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    border-top: 1px solid var(--border);
+    color: var(--faint);
+    font-size: 0.78rem;
+  }
+
+  @media (max-width: 640px) {
+    .site-footer {
+      min-height: 92px;
+      flex-direction: column;
+      align-items: flex-start;
+      justify-content: center;
+      gap: 2px;
+    }
+  }
+</style>

@@ -1,0 +1,139 @@
+---
+import { getCollection } from "astro:content";
+import { Braces, Image as ImageIcon, Network } from "@lucide/astro";
+import ArticleList from "../components/ArticleList.astro";
+import ToolLink from "../components/ToolLink.astro";
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { categoryMeta, sortArticles } from "../lib/articles";
+
+const articles = sortArticles(
+  await getCollection("articles", ({ data }) => !data.draft),
+).slice(0, 5);
+---
+
+<BaseLayout wide>
+  <section class="intro">
+    <p class="eyebrow">yuki1936 / neri</p>
+    <p class="lede">One day, we'll all become a memory of someone else's.</p>
+  </section>
+
+  <div class="home-grid">
+    <section class="recent">
+      <div class="section-heading">
+        <h2>最近文章</h2>
+        <a href="/articles/">全部文章</a>
+      </div>
+      <ArticleList articles={articles} />
+    </section>
+
+    <aside class="categories" aria-label="文章分类">
+      <p class="aside-title">分类</p>
+      <a href="/articles/life/">
+        <span>{categoryMeta.life.label}</span>
+        <small>{categoryMeta.life.description}</small>
+      </a>
+      <a href="/articles/tech/">
+        <span>{categoryMeta.tech.label}</span>
+        <small>{categoryMeta.tech.description}</small>
+      </a>
+    </aside>
+  </div>
+
+  <section class="home-tools">
+    <div class="section-heading">
+      <h2>常用工具</h2>
+      <a href="/tools/">全部工具</a>
+    </div>
+    <div class="tool-grid">
+      <ToolLink
+        href="/tools/dns/"
+        title="DNS 查询"
+        description="通过 DNS-over-HTTPS 查询常见记录。"
+        icon={Network}
+      />
+      <ToolLink
+        href="/tools/json/"
+        title="JSON Viewer"
+        description="查看 JSON 树并生成 Rust 或 Go 类型。"
+        icon={Braces}
+      />
+      <ToolLink
+        href="/tools/image/"
+        title="图片处理"
+        description="在本地裁切、缩放和压缩图片。"
+        icon={ImageIcon}
+      />
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .intro {
+    max-width: 820px;
+    padding-block: 24px 82px;
+  }
+
+  .home-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 280px;
+    gap: 64px;
+  }
+
+  .categories {
+    align-self: start;
+    padding-top: 2px;
+  }
+
+  .aside-title {
+    margin: 0 0 10px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .categories a {
+    display: grid;
+    gap: 4px;
+    padding-block: 14px;
+    border-bottom: 1px solid var(--border);
+    text-decoration: none;
+  }
+
+  .categories span {
+    font-weight: 650;
+  }
+
+  .categories small {
+    color: var(--muted);
+    font-size: 0.78rem;
+    line-height: 1.5;
+  }
+
+  .home-tools {
+    margin-top: 82px;
+  }
+
+  .tool-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  @media (max-width: 800px) {
+    .intro {
+      padding-bottom: 58px;
+    }
+
+    .home-grid {
+      grid-template-columns: 1fr;
+      gap: 48px;
+    }
+
+    .tool-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

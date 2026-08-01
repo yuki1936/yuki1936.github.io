@@ -1,0 +1,49 @@
+---
+import { Braces, Image as ImageIcon, Network } from "@lucide/astro";
+import ToolLink from "../../components/ToolLink.astro";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+---
+
+<BaseLayout title="工具" description="无需上传数据的日常浏览器工具。" wide>
+  <header class="tools-header">
+    <h1>tools</h1>
+  </header>
+  <div class="tool-grid">
+    <ToolLink
+      href="/tools/dns/"
+      title="DNS 查询"
+      description="查询 A、AAAA、MX、TXT 等常见 DNS 记录。"
+      icon={Network}
+    />
+    <ToolLink
+      href="/tools/json/"
+      title="JSON Viewer"
+      description="树形查看 JSON，并生成 Rust 或 Go 数据结构。"
+      icon={Braces}
+    />
+    <ToolLink
+      href="/tools/image/"
+      title="图片处理"
+      description="本地完成图片裁切、缩放与格式转换。"
+      icon={ImageIcon}
+    />
+  </div>
+</BaseLayout>
+
+<style>
+  .tools-header {
+    margin-bottom: 36px;
+  }
+
+  .tool-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  @media (max-width: 800px) {
+    .tool-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

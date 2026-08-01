@@ -1,0 +1,103 @@
+---
+import { getCollection, render } from "astro:content";
+import BaseLayout from "../../../layouts/BaseLayout.astro";
+import {
+  categoryMeta,
+  formatDate,
+  getArticleCategory,
+  getArticleSlug,
+  type Article,
+} from "../../../lib/articles";
+
+export async function getStaticPaths() {
+  const articles = await getCollection("articles", ({ data }) => !data.draft);
+  return articles.map((article) => {
+    const [category, slug] = getArticleSlug(article).split("/");
+    return {
+      params: { category, slug },
+      props: { article },
+    };
+  });
+}
+
+interface Props {
+  article: Article;
+}
+
+const { article } = Astro.props;
+const category = getArticleCategory(article);
+const { Content } = await render(article);
+---
+
+<BaseLayout title={article.data.title} description={article.data.description}>
+  <article>
+    <header class="article-header">
+      <a class="article-category" href={`/articles/${category}/`}>
+        {categoryMeta[category].label}
+      </a>
+      <h1>{article.data.title}</h1>
+      {
+        article.data.description && (
+          <p class="article-description">{article.data.description}</p>
+        )
+      }
+      <div class="article-dates">
+        <time datetime={article.data.published.toISOString()}>
+          发布于 {formatDate(article.data.published)}
+        </time>
+        {
+          article.data.updated && (
+            <time datetime={article.data.updated.toISOString()}>
+              更新于 {formatDate(article.data.updated)}
+            </time>
+          )
+        }
+      </div>
+    </header>
+    <div class="prose">
+      <Content />
+    </div>
+  </article>
+</BaseLayout>
+
+<style>
+  .article-header {
+    margin-bottom: 58px;
+    padding-bottom: 30px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .article-category {
+    display: inline-block;
+    margin-bottom: 12px;
+    color: var(--accent);
+    font-size: 0.82rem;
+    text-decoration: none;
+  }
+
+  .article-header h1 {
+    font-size: 3rem;
+  }
+
+  .article-description {
+    margin: 16px 0 0;
+    color: var(--muted);
+    font-size: 1.04rem;
+  }
+
+  .article-dates {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-top: 22px;
+    color: var(--faint);
+    font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+    font-size: 0.72rem;
+  }
+
+  @media (max-width: 640px) {
+    .article-header h1 {
+      font-size: 2.1rem;
+    }
+  }
+</style>

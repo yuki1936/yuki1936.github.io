@@ -1,0 +1,102 @@
+---
+import { BookOpen, Wrench } from "@lucide/astro";
+
+const pathname = Astro.url.pathname;
+const isArticles = pathname.startsWith("/articles");
+const isTools = pathname.startsWith("/tools");
+---
+
+<header class="site-header">
+  <nav class="nav shell" aria-label="主导航">
+    <a class="brand" href="/" aria-label="yuki1936 首页">
+      <span>yuki1936</span>
+    </a>
+    <div class="nav-links">
+      <a class:list={{ active: isArticles }} href="/articles/">
+        <BookOpen size={16} stroke-width={1.8} aria-hidden="true" />
+        <span>文章</span>
+      </a>
+      <a class:list={{ active: isTools }} href="/tools/">
+        <Wrench size={16} stroke-width={1.8} aria-hidden="true" />
+        <span>工具</span>
+      </a>
+      <a class:list={{ active: pathname === "/about/" }} href="/about/">关于</a>
+    </div>
+  </nav>
+</header>
+
+<style>
+  .site-header {
+    position: sticky;
+    z-index: 20;
+    top: 0;
+    border-bottom: 1px solid rgb(48 54 50 / 80%);
+    background: rgb(16 18 17 / 92%);
+    backdrop-filter: blur(12px);
+  }
+
+  .nav {
+    display: flex;
+    height: 64px;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .brand {
+    display: inline-flex;
+    height: 34px;
+    align-items: center;
+    padding-inline: 11px;
+    border: 1px solid var(--border-strong);
+    border-radius: 5px;
+    color: var(--text);
+    background: var(--surface);
+    font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+    font-size: 0.9rem;
+    font-weight: 700;
+    text-decoration: none;
+  }
+
+  .brand:hover {
+    border-color: var(--accent);
+    color: var(--accent-strong);
+  }
+
+  .nav-links {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .nav-links a {
+    display: inline-flex;
+    height: 36px;
+    align-items: center;
+    gap: 7px;
+    padding-inline: 11px;
+    border-radius: 5px;
+    color: var(--muted);
+    font-size: 0.88rem;
+    text-decoration: none;
+  }
+
+  .nav-links a:hover,
+  .nav-links a.active {
+    color: var(--text);
+    background: var(--surface);
+  }
+
+  .nav-links a.active {
+    box-shadow: inset 0 -2px var(--accent);
+  }
+
+  @media (max-width: 440px) {
+    .nav-links a {
+      padding-inline: 8px;
+    }
+
+    .nav-links svg {
+      display: none;
+    }
+  }
+</style>
