@@ -88,7 +88,34 @@ test("document converter runs the Rust Wasm format matrix", async ({ page }) => 
     await expect
       .poll(() => page.locator("#document-output").inputValue())
       .toContain(expected);
+    await page.getByRole("tab", { name: "预览" }).click();
+    await expect(page.locator("#document-preview")).toBeVisible();
+    await expect(page.locator("#document-preview")).toHaveAttribute(
+      "srcdoc",
+      /default-src 'none'/,
+    );
+    await expect(page.locator("#document-output")).toBeHidden();
+    await expect(page.frameLocator("#document-preview").locator("h1")).toHaveText("Hello");
+    await page.getByRole("tab", { name: "源码" }).click();
+    await expect(page.locator("#document-output")).toBeVisible();
   }
+
+  await expect(page.locator("#document-preview")).toHaveAttribute("sandbox", "");
+
+  await page.locator("#target-format").selectOption("html");
+  await expect(page.locator("#document-output")).toHaveValue("");
+  await expect(page.locator("#download-document")).toBeDisabled();
+  await expect(page.locator("#convert-status")).toHaveText("内容已修改，请重新转换");
+
+  await page.locator("#source-format").selectOption("markdown");
+  await page.locator("#target-format").selectOption("typst");
+  await page.locator("#document-input").fill(
+    "Text with note.[^a]\n\n[^a]: Footnote body.",
+  );
+  await page.getByRole("button", { name: "转换", exact: true }).click();
+  await expect
+    .poll(() => page.locator("#document-output").inputValue())
+    .toContain("#footnote[Footnote body.]");
 });
 
 test("visual snapshots", async ({ page }) => {

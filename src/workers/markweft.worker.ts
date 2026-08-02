@@ -18,7 +18,13 @@ type WorkerRequest =
 
 type WorkerResponse =
   | { type: "ready" }
-  | { type: "result"; id: number; output: string; detectedFormat: FormatName }
+  | {
+      type: "result";
+      id: number;
+      output: string;
+      previewHtml: string;
+      detectedFormat: FormatName;
+    }
   | { type: "error"; id?: number; message: string };
 
 const workerScope = self as unknown as {
@@ -53,7 +59,21 @@ workerScope.addEventListener("message", async ({ data }) => {
 
     const detectedFormat = data.from === "auto" ? markweft.detectFormat(data.source) : data.from;
     const output = markweft.convertDocument(data.source, detectedFormat, data.to);
-    workerScope.postMessage({ type: "result", id: data.id, output, detectedFormat });
+    let previewHtml = data.to === "html" ? output : "";
+    if (!previewHtml) {
+      try {
+        previewHtml = markweft.convertDocument(data.source, detectedFormat, "html");
+      } catch {
+        // A preview is optional; keep a successful source conversion usable.
+      }
+    }
+    workerScope.postMessage({
+      type: "result",
+      id: data.id,
+      output,
+      previewHtml,
+      detectedFormat,
+    });
   } catch (error) {
     workerScope.postMessage({
       type: "error",
