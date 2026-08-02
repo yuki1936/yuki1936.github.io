@@ -65,6 +65,16 @@ test("image tool creates a local output", async ({ page }) => {
   await page.getByRole("button", { name: "生成图片" }).click();
   await expect(page.locator("#output-panel")).toBeVisible();
   await expect(page.locator("#download-image")).toHaveAttribute("download", /processed\.webp$/);
+
+  await page.getByRole("button", { name: "等分", exact: true }).click();
+  await page.locator("#split-rows").fill("2");
+  await page.locator("#split-columns").fill("3");
+  await page.getByRole("button", { name: "生成切片" }).click();
+  await expect(page.locator(".slice-card")).toHaveCount(6);
+  await expect(page.locator("#output-info")).toContainText("2 × 3 · 6 个切片");
+  await expect(page.locator("#download-slices")).toHaveAttribute("download", /-2x3\.zip$/);
+  await expect(page.locator(".slice-card").first().getByRole("link", { name: "下载" }))
+    .toHaveAttribute("download", /-r01-c01\.webp$/);
 });
 
 test("document converter runs the Rust Wasm format matrix", async ({ page }) => {
@@ -193,6 +203,18 @@ test("visual snapshots", async ({ page }) => {
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({ path: "artifacts/json-viewer-mobile.png", fullPage: true });
+
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto("/tools/image/");
+  await page.locator("#image-input").setInputFiles(path.resolve("public/avatar.jpg"));
+  await page.getByRole("button", { name: "等分", exact: true }).click();
+  await page.getByRole("button", { name: "3 × 3" }).click();
+  await page.getByRole("button", { name: "生成切片" }).click();
+  await expect(page.locator(".slice-card")).toHaveCount(9);
+  await page.screenshot({ path: "artifacts/image-split-desktop.png", fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({ path: "artifacts/image-split-mobile.png", fullPage: true });
 
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto("/tools/convert/");
