@@ -116,6 +116,63 @@ test("document converter runs the Rust Wasm format matrix", async ({ page }) => 
   await expect
     .poll(() => page.locator("#document-output").inputValue())
     .toContain("#footnote[Footnote body.]");
+
+  await page.getByRole("tab", { name: "AST" }).click();
+  await expect(page.locator("#document-ast")).toBeVisible();
+  await expect(page.locator("#document-ast")).toHaveValue(/"type": "footnote_definition"/);
+
+  await page.locator("#source-format").selectOption("html");
+  await page.locator("#target-format").selectOption("typst");
+  await page.locator("#document-input").fill(
+    "<details><summary>More</summary><p>Body</p></details><video src=\"x.mp4\"></video>",
+  );
+  await page.getByRole("button", { name: "转换", exact: true }).click();
+  await expect(page.locator("#conversion-diagnostics")).toBeVisible();
+  await expect(page.locator("#conversion-diagnostics")).toContainText("可折叠内容");
+  await expect(page.locator("#conversion-diagnostics")).toContainText("原始内容");
+
+  await page.locator(".converter-options summary").click();
+  await page.locator("#strict-mode").check();
+  await page.getByRole("button", { name: "转换", exact: true }).click();
+  await expect(page.locator("#convert-status")).toHaveAttribute("data-state", "error");
+  await page.locator("#strict-mode").uncheck();
+
+  await page.locator("#source-format").selectOption("markdown");
+  await page.locator("#target-format").selectOption("html");
+  await page.locator("#full-html").check();
+  await page.locator("#link-prefix").fill("/docs");
+  await page.locator("#image-prefix").fill("/assets");
+  await page.locator("#document-input").fill(
+    "---\ntitle: Complete\nlanguage: zh\n---\n\n[Guide](guide.md) ![A](a.png)",
+  );
+  await page.getByRole("button", { name: "转换", exact: true }).click();
+  await expect.poll(() => page.locator("#document-output").inputValue()).toContain("<!doctype html>");
+  await expect(page.locator("#document-output")).toHaveValue(/lang="zh"/);
+  await expect(page.locator("#document-output")).toHaveValue(/href="\/docs\/guide.md"/);
+  await expect(page.locator("#document-output")).toHaveValue(/src="\/assets\/a.png"/);
+
+  await page.locator("#example-input").selectOption("typst");
+  await expect(page.locator("#source-format")).toHaveValue("typst");
+  await expect(page.locator("#document-input")).toHaveValue(/#footnote\[note\]/);
+});
+
+test("document converter rejects oversized imports and accepts drops", async ({ page }) => {
+  await page.goto("/tools/convert/");
+  await expect(page.locator("#convert-status")).toHaveText("转换器已就绪", { timeout: 15_000 });
+  await page.locator("#document-file").setInputFiles({
+    name: "large.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.alloc(5 * 1024 * 1024 + 1, 65),
+  });
+  await expect(page.locator("#convert-status")).toHaveText("文件不能超过 5 MiB");
+
+  await page.locator("#input-panel").evaluate((panel) => {
+    const transfer = new DataTransfer();
+    transfer.items.add(new File(["# Dropped"], "dropped.md", { type: "text/markdown" }));
+    panel.dispatchEvent(new DragEvent("drop", { bubbles: true, dataTransfer: transfer }));
+  });
+  await expect(page.locator("#document-input")).toHaveValue("# Dropped");
+  await expect(page.locator("#source-format")).toHaveValue("markdown");
 });
 
 test("visual snapshots", async ({ page }) => {
@@ -136,4 +193,16 @@ test("visual snapshots", async ({ page }) => {
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({ path: "artifacts/json-viewer-mobile.png", fullPage: true });
+
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto("/tools/convert/");
+  await expect(page.locator("#convert-status")).toHaveText("转换器已就绪", { timeout: 15_000 });
+  await page.locator(".converter-options summary").click();
+  await page.locator("#example-input").selectOption("markdown");
+  await page.getByRole("button", { name: "转换", exact: true }).click();
+  await expect(page.locator("#convert-status")).toHaveText("转换完成");
+  await page.screenshot({ path: "artifacts/converter-desktop.png", fullPage: true });
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: "artifacts/converter-mobile.png", fullPage: false });
 });

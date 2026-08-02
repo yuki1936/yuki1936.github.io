@@ -4,6 +4,29 @@ interface MarkweftModule {
   default: () => Promise<unknown>;
   convertDocument: (source: string, from: FormatName, to: FormatName) => string;
   detectFormat: (source: string) => FormatName;
+  detectFormatDetails: (source: string) => string;
+  convertDocumentWithReport: (
+    source: string,
+    from: FormatName,
+    to: FormatName,
+    options: string,
+  ) => string;
+}
+
+interface ConversionOptions {
+  mode: "strict" | "compatible";
+  full_html_document: boolean;
+  document_title?: string;
+  link_prefix?: string;
+  image_prefix?: string;
+}
+
+interface Diagnostic {
+  severity: "info" | "warning" | "error";
+  code: string;
+  message: string;
+  line?: number;
+  column?: number;
 }
 
 type WorkerRequest =
@@ -14,6 +37,7 @@ type WorkerRequest =
       source: string;
       from: FormatName | "auto";
       to: FormatName;
+      options: ConversionOptions;
     };
 
 type WorkerResponse =
@@ -23,7 +47,10 @@ type WorkerResponse =
       id: number;
       output: string;
       previewHtml: string;
+      astJson: string;
+      diagnostics: Diagnostic[];
       detectedFormat: FormatName;
+      confidence: number;
     }
   | { type: "error"; id?: number; message: string };
 
@@ -57,12 +84,37 @@ workerScope.addEventListener("message", async ({ data }) => {
       return;
     }
 
-    const detectedFormat = data.from === "auto" ? markweft.detectFormat(data.source) : data.from;
-    const output = markweft.convertDocument(data.source, detectedFormat, data.to);
+    const detection = JSON.parse(markweft.detectFormatDetails(data.source)) as {
+      format: FormatName;
+      confidence: number;
+    };
+    const detectedFormat = data.from === "auto" ? detection.format : data.from;
+    const report = JSON.parse(markweft.convertDocumentWithReport(
+      data.source,
+      detectedFormat,
+      data.to,
+      JSON.stringify(data.options),
+    )) as {
+      output: string;
+      document: unknown;
+      diagnostics: Diagnostic[];
+    };
+    const output = report.output;
     let previewHtml = data.to === "html" ? output : "";
     if (!previewHtml) {
       try {
-        previewHtml = markweft.convertDocument(data.source, detectedFormat, "html");
+        const previewOptions: ConversionOptions = {
+          ...data.options,
+          mode: "compatible",
+          full_html_document: false,
+        };
+        const previewReport = JSON.parse(markweft.convertDocumentWithReport(
+          data.source,
+          detectedFormat,
+          "html",
+          JSON.stringify(previewOptions),
+        )) as { output: string };
+        previewHtml = previewReport.output;
       } catch {
         // A preview is optional; keep a successful source conversion usable.
       }
@@ -72,7 +124,10 @@ workerScope.addEventListener("message", async ({ data }) => {
       id: data.id,
       output,
       previewHtml,
+      astJson: JSON.stringify(report.document, null, 2),
+      diagnostics: report.diagnostics,
       detectedFormat,
+      confidence: detection.confidence,
     });
   } catch (error) {
     workerScope.postMessage({

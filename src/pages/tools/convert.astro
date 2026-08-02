@@ -49,13 +49,40 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
     </button>
   </div>
 
+  <details class="converter-options">
+    <summary>选项</summary>
+    <div class="options-grid">
+      <label class="field-label">
+        示例
+        <select class="select" id="example-input">
+          <option value="">选择示例</option>
+          <option value="markdown">Markdown</option>
+          <option value="html">HTML</option>
+          <option value="typst">Typst</option>
+          <option value="latex">LaTeX</option>
+        </select>
+      </label>
+      <label class="field-label">
+        链接前缀
+        <input class="field" id="link-prefix" type="text" placeholder="/docs" />
+      </label>
+      <label class="field-label">
+        图片前缀
+        <input class="field" id="image-prefix" type="text" placeholder="/assets" />
+      </label>
+      <label class="option-toggle"><input id="strict-mode" type="checkbox" /> 严格模式</label>
+      <label class="option-toggle"><input id="full-html" type="checkbox" /> 完整 HTML 文档</label>
+    </div>
+  </details>
+
   <div class="converter-status">
     <p id="convert-status" class="status-line" aria-live="polite">正在载入转换器…</p>
     <span>markweft-rs / WebAssembly</span>
   </div>
+  <div id="conversion-diagnostics" class="conversion-diagnostics" aria-live="polite" hidden></div>
 
   <div class="editor-grid">
-    <section class="editor-panel">
+    <section class="editor-panel" id="input-panel">
       <div class="panel-header">
         <label for="document-input">输入</label>
         <label class="panel-action" for="document-file">
@@ -102,6 +129,16 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
             tabindex="-1"
             disabled
           >预览</button>
+          <button
+            class="view-tab"
+            id="ast-view-tab"
+            type="button"
+            role="tab"
+            aria-controls="document-ast"
+            aria-selected="false"
+            tabindex="-1"
+            disabled
+          >AST</button>
         </div>
         <div class="panel-actions">
           <button id="copy-document" type="button" disabled>
@@ -128,6 +165,14 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
         title="转换结果预览"
         sandbox=""
         hidden></iframe>
+      <textarea
+        class="textarea document-editor"
+        id="document-ast"
+        role="tabpanel"
+        aria-labelledby="ast-view-tab"
+        spellcheck="false"
+        readonly
+        hidden></textarea>
       <div class="editor-footer">
         <span id="output-characters">0 字符</span>
         <span id="detected-format"></span>
@@ -138,6 +183,14 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
 
 <script>
   type FormatName = "markdown" | "html" | "typst" | "latex";
+  type OutputView = "source" | "preview" | "ast";
+  interface Diagnostic {
+    severity: "info" | "warning" | "error";
+    code: string;
+    message: string;
+    line?: number;
+    column?: number;
+  }
   type WorkerResponse =
     | { type: "ready" }
     | {
@@ -145,7 +198,10 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
         id: number;
         output: string;
         previewHtml: string;
+        astJson: string;
+        diagnostics: Diagnostic[];
         detectedFormat: FormatName;
+        confidence: number;
       }
     | { type: "error"; id?: number; message: string };
 
@@ -177,14 +233,49 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
     tex: "latex",
     latex: "latex",
   };
+  const examples: Record<FormatName, string> = {
+    markdown: `---
+title: Example
+language: zh
+---
+
+# Hello
+
+> [!NOTE] Note
+> Markdown with **strong**, <u>underline</u>, and a footnote.[^note]
+
+| Name | Value |
+| --- | ---: |
+| Rust | 1 |
+
+[^note]: Footnote body.`,
+    html: `<article><h1 id="hello">Hello</h1><p><mark>Highlighted</mark> and <kbd>Ctrl</kbd>.</p><details open><summary>More</summary><p>Details body.</p></details><figure><img src="image.png" alt="Example"><figcaption>Caption</figcaption></figure></article>`,
+    typst: `#set document(title: "Example")
+= Hello <hello>
+
+Text with #underline[underline], #highlight[highlight], and #footnote[note]. See @hello.
+
+#quote(block: true)[A block quote.]`,
+    latex: `\\title{Example}
+\\author{Yuki}
+\\section{Hello}\\label{sec:hello}
+
+Text with \\underline{underline}, \\hl{highlight}, and \\footnote{note}. See \\ref{sec:hello}.
+
+\\begin{figure}\\includegraphics{image.png}\\caption{Caption}\\end{figure}`,
+  };
+  const MAX_FILE_SIZE = 5 * 1024 * 1024;
+  const CONVERSION_TIMEOUT = 10_000;
 
   const sourceFormat = document.querySelector<HTMLSelectElement>("#source-format");
   const targetFormat = document.querySelector<HTMLSelectElement>("#target-format");
   const input = document.querySelector<HTMLTextAreaElement>("#document-input");
   const output = document.querySelector<HTMLTextAreaElement>("#document-output");
   const preview = document.querySelector<HTMLIFrameElement>("#document-preview");
+  const astOutput = document.querySelector<HTMLTextAreaElement>("#document-ast");
   const sourceViewTab = document.querySelector<HTMLButtonElement>("#source-view-tab");
   const previewViewTab = document.querySelector<HTMLButtonElement>("#preview-view-tab");
+  const astViewTab = document.querySelector<HTMLButtonElement>("#ast-view-tab");
   const status = document.querySelector<HTMLElement>("#convert-status");
   const detected = document.querySelector<HTMLElement>("#detected-format");
   const inputCharacters = document.querySelector<HTMLElement>("#input-characters");
@@ -193,13 +284,22 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
   const copyButton = document.querySelector<HTMLButtonElement>("#copy-document");
   const downloadButton = document.querySelector<HTMLButtonElement>("#download-document");
   const fileInput = document.querySelector<HTMLInputElement>("#document-file");
+  const inputPanel = document.querySelector<HTMLElement>("#input-panel");
+  const diagnostics = document.querySelector<HTMLElement>("#conversion-diagnostics");
+  const exampleInput = document.querySelector<HTMLSelectElement>("#example-input");
+  const strictMode = document.querySelector<HTMLInputElement>("#strict-mode");
+  const fullHtml = document.querySelector<HTMLInputElement>("#full-html");
+  const linkPrefix = document.querySelector<HTMLInputElement>("#link-prefix");
+  const imagePrefix = document.querySelector<HTMLInputElement>("#image-prefix");
 
-  const worker = new Worker(new URL("../../workers/markweft.worker.ts", import.meta.url), {
-    type: "module",
-  });
+  let worker: Worker;
   let ready = false;
   let requestId = 0;
   let lastDetected: FormatName | undefined;
+  let currentView: OutputView = "source";
+  let converting = false;
+  let conversionTimer: number | undefined;
+  let preserveStatusOnReady = false;
 
   function previewDocument(content: string) {
     return `<!doctype html>
@@ -217,6 +317,11 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
     p, ul, ol, blockquote, pre, table { margin: 0 0 1em; }
     a { color: #8fd3a9; pointer-events: none; } img { max-width: 100%; height: auto; }
     blockquote { margin-left: 0; padding-left: 1em; border-left: 2px solid #405047; color: #a7afa9; }
+    aside.admonition { margin: 0 0 1em; padding: 12px 14px; border-left: 3px solid #b7954b; background: #151812; }
+    .admonition-title { display: block; margin-bottom: .4em; } details, figure { margin: 0 0 1em; }
+    summary { cursor: pointer; color: #edf0ee; } figcaption { margin-top: .5em; color: #a7afa9; text-align: center; }
+    mark { padding: 0 .18em; color: #10130f; background: #c8b86c; } kbd { padding: 1px 5px; border: 1px solid #526158; background: #171c19; }
+    .small-caps { font-variant: small-caps; } .page-break { margin: 1.5em 0; border-top: 1px dashed #526158; }
     code, pre { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
     code { color: #d7e9dc; } pre { overflow: auto; padding: 12px; background: #151a17; }
     table { width: 100%; border-collapse: collapse; } th, td { padding: 7px 9px; border: 1px solid #303a34; text-align: left; }
@@ -226,16 +331,24 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
 </html>`;
   }
 
-  function setOutputView(view: "source" | "preview") {
+  function setOutputView(view: OutputView) {
     const showPreview = view === "preview" && !previewViewTab?.disabled;
-    if (output) output.hidden = showPreview;
+    const showAst = view === "ast" && !astViewTab?.disabled;
+    currentView = showPreview ? "preview" : showAst ? "ast" : "source";
+    if (output) output.hidden = showPreview || showAst;
     if (preview) preview.hidden = !showPreview;
-    sourceViewTab?.classList.toggle("active", !showPreview);
+    if (astOutput) astOutput.hidden = !showAst;
+    sourceViewTab?.classList.toggle("active", !showPreview && !showAst);
     previewViewTab?.classList.toggle("active", showPreview);
-    sourceViewTab?.setAttribute("aria-selected", String(!showPreview));
+    astViewTab?.classList.toggle("active", showAst);
+    sourceViewTab?.setAttribute("aria-selected", String(!showPreview && !showAst));
     previewViewTab?.setAttribute("aria-selected", String(showPreview));
-    if (sourceViewTab) sourceViewTab.tabIndex = showPreview ? -1 : 0;
+    astViewTab?.setAttribute("aria-selected", String(showAst));
+    if (sourceViewTab) sourceViewTab.tabIndex = showPreview || showAst ? -1 : 0;
     if (previewViewTab) previewViewTab.tabIndex = showPreview ? 0 : -1;
+    if (astViewTab) astViewTab.tabIndex = showAst ? 0 : -1;
+    const length = showAst ? (astOutput?.value.length ?? 0) : (output?.value.length ?? 0);
+    if (outputCharacters) outputCharacters.textContent = `${length.toLocaleString()} 字符`;
   }
 
   function setStatus(message: string, state = "") {
@@ -244,16 +357,46 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
     status.dataset.state = state;
   }
 
-  function setOutput(value: string, previewHtml = "", detectedFormat?: FormatName) {
+  function setDiagnostics(items: Diagnostic[]) {
+    if (!diagnostics) return;
+    diagnostics.replaceChildren();
+    diagnostics.hidden = items.length === 0;
+    for (const item of items) {
+      const line = item.line ? `（${item.line}:${item.column ?? 1}）` : "";
+      const paragraph = document.createElement("p");
+      paragraph.dataset.severity = item.severity;
+      paragraph.textContent = `${line}${diagnosticLabel(item.code, item.message)}`;
+      diagnostics.append(paragraph);
+    }
+  }
+
+  function diagnosticLabel(code: string, fallback: string) {
+    const labels: Record<string, string> = {
+      raw_preserved: "部分块内容没有目标格式的等价结构，已保留为原始内容。",
+      raw_inline_preserved: "部分行内内容没有目标格式的等价结构，已保留。",
+      details_degraded: "可折叠内容在目标格式中会转换为静态内容。",
+      span_attributes_degraded: "目标格式无法保留全部 span 自定义属性。",
+      metadata_custom: "目标格式无法保留全部自定义文档元数据。",
+      parse_error: "输入中存在无法完整解析的语法。",
+    };
+    return labels[code] ?? fallback;
+  }
+
+  function setOutput(value: string, previewHtml = "", astJson = "", detectedFormat?: FormatName, confidence?: number, warnings: Diagnostic[] = []) {
     if (output) output.value = value;
+    if (astOutput) astOutput.value = astJson;
     if (preview) preview.srcdoc = previewHtml ? previewDocument(previewHtml) : "";
     if (previewViewTab) previewViewTab.disabled = !previewHtml;
+    if (astViewTab) astViewTab.disabled = !astJson;
     if (outputCharacters) outputCharacters.textContent = `${value.length.toLocaleString()} 字符`;
     if (copyButton) copyButton.disabled = !value;
     if (downloadButton) downloadButton.disabled = !value;
     if (detected) {
-      detected.textContent = detectedFormat ? `识别为 ${formatLabels[detectedFormat]}` : "";
+      detected.textContent = detectedFormat
+        ? `识别为 ${formatLabels[detectedFormat]}${confidence === undefined ? "" : ` · ${Math.round(confidence * 100)}%`}`
+        : "";
     }
+    setDiagnostics(warnings);
     if (!value) setOutputView("source");
   }
 
@@ -264,6 +407,7 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
 
   function invalidateOutput() {
     requestId += 1;
+    if (converting) restartWorker(true);
     lastDetected = undefined;
     setOutput("");
     if (convertButton) convertButton.disabled = !ready;
@@ -273,64 +417,112 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
   function requestConversion() {
     const source = input?.value ?? "";
     if (!source.trim()) return setStatus("请输入需要转换的内容", "error");
+    if (new Blob([source]).size > MAX_FILE_SIZE) return setStatus("文档不能超过 5 MiB", "error");
     if (!ready || !sourceFormat || !targetFormat || !convertButton) return;
 
     requestId += 1;
+    converting = true;
     convertButton.disabled = true;
     setStatus("正在转换…");
+    window.clearTimeout(conversionTimer);
+    const activeRequest = requestId;
+    conversionTimer = window.setTimeout(() => {
+      if (!converting || activeRequest !== requestId) return;
+      converting = false;
+      restartWorker(true);
+      setStatus("转换超时，请缩小文档后重试", "error");
+    }, CONVERSION_TIMEOUT);
     worker.postMessage({
       type: "convert",
       id: requestId,
       source,
       from: sourceFormat.value,
       to: targetFormat.value,
+      options: {
+        mode: strictMode?.checked ? "strict" : "compatible",
+        full_html_document: fullHtml?.checked && targetFormat.value === "html",
+        link_prefix: linkPrefix?.value.trim() || undefined,
+        image_prefix: imagePrefix?.value.trim() || undefined,
+      },
     });
   }
 
-  worker.addEventListener("message", ({ data }: MessageEvent<WorkerResponse>) => {
+  function handleWorkerMessage({ data }: MessageEvent<WorkerResponse>) {
     if (data.type === "ready") {
       ready = true;
       if (convertButton) convertButton.disabled = false;
-      setStatus("转换器已就绪", "success");
+      if (!preserveStatusOnReady) setStatus("转换器已就绪", "success");
+      preserveStatusOnReady = false;
       return;
     }
     if (data.type === "result" && data.id === requestId) {
+      converting = false;
+      window.clearTimeout(conversionTimer);
       lastDetected = data.detectedFormat;
-      setOutput(data.output, data.previewHtml, data.detectedFormat);
+      setOutput(data.output, data.previewHtml, data.astJson, data.detectedFormat, data.confidence, data.diagnostics);
       if (convertButton) convertButton.disabled = false;
       setStatus("转换完成", "success");
       return;
     }
     if (data.type === "error" && (data.id === undefined || data.id === requestId)) {
+      converting = false;
+      window.clearTimeout(conversionTimer);
       if (convertButton) convertButton.disabled = !ready;
       setStatus(data.message || "转换失败", "error");
     }
-  });
+  }
 
-  worker.addEventListener("error", () => {
+  function handleWorkerError() {
+    converting = false;
+    window.clearTimeout(conversionTimer);
     if (convertButton) convertButton.disabled = true;
     setStatus("无法载入转换器", "error");
-  });
-  worker.postMessage({ type: "init" });
+  }
+
+  function restartWorker(preserveStatus = false) {
+    worker?.terminate();
+    ready = false;
+    converting = false;
+    preserveStatusOnReady = preserveStatus;
+    worker = new Worker(new URL("../../workers/markweft.worker.ts", import.meta.url), { type: "module" });
+    worker.addEventListener("message", handleWorkerMessage);
+    worker.addEventListener("error", handleWorkerError);
+    worker.postMessage({ type: "init" });
+  }
+
+  restartWorker();
 
   document.querySelector("#convert-document")?.addEventListener("click", requestConversion);
   sourceViewTab?.addEventListener("click", () => setOutputView("source"));
   previewViewTab?.addEventListener("click", () => setOutputView("preview"));
+  astViewTab?.addEventListener("click", () => setOutputView("ast"));
   document.querySelector(".view-tabs")?.addEventListener("keydown", (event) => {
     if (!(event instanceof KeyboardEvent) || !["ArrowLeft", "ArrowRight"].includes(event.key)) return;
     event.preventDefault();
-    const view = event.key === "ArrowRight" && !previewViewTab?.disabled
-      ? "preview"
-      : "source";
+    const available: OutputView[] = ["source"];
+    if (!previewViewTab?.disabled) available.push("preview");
+    if (!astViewTab?.disabled) available.push("ast");
+    const current = Math.max(0, available.indexOf(currentView));
+    const direction = event.key === "ArrowRight" ? 1 : -1;
+    const view = available[(current + direction + available.length) % available.length];
     setOutputView(view);
-    (view === "preview" ? previewViewTab : sourceViewTab)?.focus();
+    (view === "preview" ? previewViewTab : view === "ast" ? astViewTab : sourceViewTab)?.focus();
   });
   input?.addEventListener("input", () => {
     updateInputStats();
     invalidateOutput();
   });
   sourceFormat?.addEventListener("change", invalidateOutput);
-  targetFormat?.addEventListener("change", invalidateOutput);
+  targetFormat?.addEventListener("change", () => {
+    if (fullHtml) {
+      fullHtml.disabled = targetFormat.value !== "html";
+      if (fullHtml.disabled) fullHtml.checked = false;
+    }
+    invalidateOutput();
+  });
+  for (const option of [strictMode, fullHtml, linkPrefix, imagePrefix]) {
+    option?.addEventListener("change", invalidateOutput);
+  }
   input?.addEventListener("keydown", (event) => {
     if ((event.ctrlKey || event.metaKey) && event.key === "Enter") requestConversion();
   });
@@ -359,9 +551,12 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
     input?.focus();
   });
 
-  fileInput?.addEventListener("change", async () => {
-    const file = fileInput.files?.[0];
+  async function loadFile(file?: File) {
     if (!file || !input) return;
+    if (file.size > MAX_FILE_SIZE) {
+      setStatus("文件不能超过 5 MiB", "error");
+      return;
+    }
     try {
       input.value = await file.text();
       const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
@@ -372,15 +567,42 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
       setStatus(`${file.name} 已导入`, "success");
     } catch {
       setStatus("无法读取这个文件", "error");
-    } finally {
-      fileInput.value = "";
     }
+  }
+
+  fileInput?.addEventListener("change", async () => {
+    await loadFile(fileInput.files?.[0]);
+    fileInput.value = "";
+  });
+
+  for (const eventName of ["dragenter", "dragover"]) {
+    inputPanel?.addEventListener(eventName, (event) => {
+      event.preventDefault();
+      inputPanel.classList.add("dragging");
+    });
+  }
+  for (const eventName of ["dragleave", "drop"]) {
+    inputPanel?.addEventListener(eventName, (event) => {
+      event.preventDefault();
+      inputPanel.classList.remove("dragging");
+    });
+  }
+  inputPanel?.addEventListener("drop", (event) => loadFile(event.dataTransfer?.files[0]));
+
+  exampleInput?.addEventListener("change", () => {
+    const format = exampleInput.value as FormatName;
+    if (!examples[format] || !input || !sourceFormat) return;
+    input.value = examples[format];
+    sourceFormat.value = format;
+    updateInputStats();
+    invalidateOutput();
   });
 
   copyButton?.addEventListener("click", async () => {
-    if (!output?.value) return;
+    const value = currentView === "ast" ? astOutput?.value : output?.value;
+    if (!value) return;
     try {
-      await navigator.clipboard.writeText(output.value);
+      await navigator.clipboard.writeText(value);
       setStatus("输出已复制", "success");
     } catch {
       setStatus("浏览器拒绝了剪贴板访问", "error");
@@ -388,12 +610,14 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
   });
 
   downloadButton?.addEventListener("click", () => {
-    if (!output?.value || !targetFormat) return;
+    const value = currentView === "ast" ? astOutput?.value : output?.value;
+    if (!value || !targetFormat) return;
     const format = targetFormat.value as FormatName;
-    const url = URL.createObjectURL(new Blob([output.value], { type: mimeTypes[format] }));
+    const isAst = currentView === "ast";
+    const url = URL.createObjectURL(new Blob([value], { type: isAst ? "application/json;charset=utf-8" : mimeTypes[format] }));
     const link = document.createElement("a");
     link.href = url;
-    link.download = `converted.${extensions[format]}`;
+    link.download = isAst ? "document.ast.json" : `converted.${extensions[format]}`;
     document.body.append(link);
     link.click();
     link.remove();
@@ -419,6 +643,37 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
     background: var(--surface);
   }
 
+  .converter-options {
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+
+  .converter-options summary {
+    width: fit-content;
+    padding: 10px 18px;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 0.76rem;
+  }
+
+  .options-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(140px, 1fr)) auto auto;
+    align-items: end;
+    gap: 10px;
+    padding: 4px 18px 16px;
+  }
+
+  .option-toggle {
+    display: inline-flex;
+    min-height: 42px;
+    align-items: center;
+    gap: 7px;
+    color: var(--muted);
+    font-size: 0.76rem;
+    white-space: nowrap;
+  }
+
   .swap-button {
     width: 42px;
     padding: 0;
@@ -442,6 +697,23 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
     font-size: 0.7rem;
   }
 
+  .conversion-diagnostics {
+    margin: -4px 0 14px;
+    padding: 9px 12px;
+    border-left: 2px solid #b7954b;
+    color: var(--muted);
+    background: #171811;
+    font-size: 0.74rem;
+  }
+
+  .conversion-diagnostics p {
+    margin: 0;
+  }
+
+  .conversion-diagnostics p + p {
+    margin-top: 4px;
+  }
+
   .editor-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -454,6 +726,11 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
     border: 1px solid var(--border);
     border-radius: 6px;
     background: var(--surface);
+  }
+
+  #input-panel.dragging {
+    border-color: var(--accent);
+    box-shadow: inset 0 0 0 1px var(--accent);
   }
 
   .panel-header,
@@ -579,6 +856,11 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
       grid-column: 1 / -1;
     }
 
+    .options-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      padding-inline: 14px;
+    }
+
     .editor-grid {
       grid-template-columns: 1fr;
     }
@@ -608,6 +890,11 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
       flex-direction: column;
       justify-content: center;
       gap: 0;
+    }
+
+    .options-grid {
+      grid-template-columns: 1fr;
+      padding-inline: 10px;
     }
   }
 </style>
