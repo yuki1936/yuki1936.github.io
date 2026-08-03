@@ -1,7 +1,6 @@
 import type { CollectionEntry } from "astro:content";
 
 export type Article = CollectionEntry<"articles">;
-export type ArticleCategory = "life" | "tech";
 
 export const categoryMeta = {
   life: {
@@ -12,10 +11,21 @@ export const categoryMeta = {
     label: "技术",
     description: "开发记录、问题分析与技术实践。",
   },
-} satisfies Record<ArticleCategory, { label: string; description: string }>;
+} as const satisfies Record<string, { label: string; description: string }>;
+
+export type ArticleCategory = keyof typeof categoryMeta;
+
+export function isArticleCategory(value: string): value is ArticleCategory {
+  return Object.prototype.hasOwnProperty.call(categoryMeta, value);
+}
 
 export function getArticleCategory(article: Article): ArticleCategory {
-  return article.id.startsWith("tech/") ? "tech" : "life";
+  const [category] = article.id.split("/");
+  if (category && isArticleCategory(category)) return category;
+
+  throw new Error(
+    `Unknown article category "${category || "(empty)"}" in "${article.id}". Add it to categoryMeta.`,
+  );
 }
 
 export function getArticleSlug(article: Article): string {

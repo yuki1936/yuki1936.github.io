@@ -77,6 +77,33 @@ test("image tool creates a local output", async ({ page }) => {
     .toHaveAttribute("download", /-r01-c01\.webp$/);
 });
 
+test("article tables of contents and heading permalinks follow article length", async ({ page }) => {
+  await page.goto("/articles/life/2026-8-3-songs-i-listen-to/");
+  const toc = page.locator(".article-toc");
+  await expect(toc).toBeVisible();
+  await expect(toc.locator("details")).not.toHaveAttribute("open", "");
+  await toc.locator("summary").click();
+  await expect(toc.locator("details")).toHaveAttribute("open", "");
+  await expect(toc.getByRole("link")).toHaveCount(4);
+  await expect(toc.getByRole("link", { name: "Flower Dance —— DJ Okawari" }))
+    .toHaveAttribute("href", "#flower-dance--dj-okawari");
+
+  const flowerHeading = page.locator("#flower-dance--dj-okawari");
+  await flowerHeading.hover();
+  await flowerHeading.getByRole("link", { name: /链接到/ }).click();
+  await expect(page).toHaveURL(/#flower-dance--dj-okawari$/);
+  await expect(flowerHeading).toHaveCSS("color", "rgb(179, 223, 191)");
+
+  await page.goto(
+    "/articles/tech/2023-10-1-oct-leetcoding-challenge-rust-solution/",
+  );
+  await expect(page.locator(".article-toc")).toBeVisible();
+  await expect(page.locator(".article-toc details")).not.toHaveAttribute("open", "");
+
+  await page.goto("/articles/life/my-cat/");
+  await expect(page.locator(".article-toc")).toHaveCount(0);
+});
+
 test("document converter runs the Rust Wasm format matrix", async ({ page }) => {
   await page.goto("/tools/convert/");
   await expect(page.locator("#convert-status")).toHaveText("转换器已就绪", {

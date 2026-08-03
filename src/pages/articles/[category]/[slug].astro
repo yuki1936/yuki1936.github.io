@@ -1,5 +1,6 @@
 ---
 import { getCollection, render } from "astro:content";
+import { ChevronDown, Link2, ListTree } from "@lucide/astro";
 import BaseLayout from "../../../layouts/BaseLayout.astro";
 import {
   categoryMeta,
@@ -26,7 +27,9 @@ interface Props {
 
 const { article } = Astro.props;
 const category = getArticleCategory(article);
-const { Content } = await render(article);
+const { Content, headings } = await render(article);
+const tocItems = headings.filter((heading) => heading.depth === 2);
+const showToc = tocItems.length >= 3;
 ---
 
 <BaseLayout title={article.data.title} description={article.data.description}>
@@ -54,11 +57,63 @@ const { Content } = await render(article);
         }
       </div>
     </header>
+    {
+      showToc && (
+        <nav class="article-toc" aria-label="本文目录">
+          <details>
+            <summary>
+              <span class="toc-title">
+                <ListTree size={17} stroke-width={1.8} aria-hidden="true" />
+                本文目录
+              </span>
+              <span class="toc-meta">
+                {tocItems.length} 节
+                <ChevronDown
+                  class="toc-chevron"
+                  size={16}
+                  stroke-width={1.8}
+                  aria-hidden="true"
+                />
+              </span>
+            </summary>
+            <ol>
+              {tocItems.map((heading) => (
+                <li>
+                  <a href={`#${heading.slug}`}>{heading.text}</a>
+                </li>
+              ))}
+            </ol>
+          </details>
+        </nav>
+      )
+    }
     <div class="prose">
       <Content />
     </div>
+    <template id="heading-anchor-template">
+      <a class="heading-anchor" title="此节链接">
+        <Link2 size={15} stroke-width={1.8} aria-hidden="true" />
+      </a>
+    </template>
   </article>
 </BaseLayout>
+
+<script>
+  const template = document.querySelector<HTMLTemplateElement>("#heading-anchor-template");
+
+  if (template) {
+    for (const heading of document.querySelectorAll<HTMLElement>(
+      ".prose h2[id], .prose h3[id]",
+    )) {
+      if (heading.querySelector(".heading-anchor")) continue;
+      const anchor = template.content.firstElementChild?.cloneNode(true);
+      if (!(anchor instanceof HTMLAnchorElement)) continue;
+      anchor.href = `#${heading.id}`;
+      anchor.setAttribute("aria-label", `链接到“${heading.textContent?.trim() ?? "此节"}”`);
+      heading.append(" ", anchor);
+    }
+  }
+</script>
 
 <style>
   .article-header {
@@ -76,7 +131,7 @@ const { Content } = await render(article);
   }
 
   .article-header h1 {
-    font-size: 3rem;
+    font-size: 1.85rem;
   }
 
   .article-description {
@@ -95,9 +150,88 @@ const { Content } = await render(article);
     font-size: 0.72rem;
   }
 
+  .article-toc {
+    margin: -18px 0 58px;
+    border-block: 1px solid var(--border);
+  }
+
+  .article-toc summary {
+    display: flex;
+    min-height: 48px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    color: var(--muted);
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .article-toc summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .toc-title,
+  .toc-meta {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .toc-title {
+    gap: 8px;
+    color: var(--text);
+    font-size: 0.84rem;
+    font-weight: 650;
+  }
+
+  .toc-meta {
+    flex: none;
+    gap: 6px;
+    color: var(--faint);
+    font-size: 0.75rem;
+  }
+
+  .toc-chevron {
+    transition: transform 160ms ease;
+  }
+
+  .article-toc details[open] .toc-chevron {
+    transform: rotate(180deg);
+  }
+
+  .article-toc ol {
+    max-height: 55vh;
+    margin: 0 0 20px;
+    padding: 2px 0 0 1.7rem;
+    overflow-y: auto;
+    color: var(--faint);
+  }
+
+  .article-toc li {
+    padding-left: 4px;
+  }
+
+  .article-toc li + li {
+    margin-top: 8px;
+  }
+
+  .article-toc a {
+    color: var(--muted);
+    font-size: 0.88rem;
+    text-decoration: none;
+  }
+
+  .article-toc a:hover,
+  .article-toc a:focus-visible {
+    color: var(--accent-strong);
+  }
+
   @media (max-width: 640px) {
     .article-header h1 {
-      font-size: 2.1rem;
+      font-size: 1.65rem;
+    }
+
+    .article-toc {
+      margin-bottom: 46px;
     }
   }
 </style>
