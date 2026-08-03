@@ -1,6 +1,6 @@
 ---
-title: 最近在听的一些歌
-description: 2026 年的个人歌单
+title: 歌单里的记忆碎片
+description: 一个夏天、一场旅行，以及几段被旋律保存下来的时间。
 published: 2026-08-03
 draft: false
 ---
