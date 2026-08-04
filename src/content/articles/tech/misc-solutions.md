@@ -2,7 +2,7 @@
 title: 零散题解
 description: 记录一些没有单独成篇的数学题、算法题与 Rust 解法。内容比较杂，想到什么、看到什么就写什么。
 published: 2026-08-04
-draft: true
+draft: false
 ---
 
 ## 开关阵列
