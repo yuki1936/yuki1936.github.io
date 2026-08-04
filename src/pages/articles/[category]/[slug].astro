@@ -29,7 +29,7 @@ const { article } = Astro.props;
 const category = getArticleCategory(article);
 const { Content, headings } = await render(article);
 const tocItems = headings.filter((heading) => heading.depth === 2);
-const showToc = tocItems.length >= 3;
+const showToc = tocItems.length >= 2;
 ---
 
 <BaseLayout title={article.data.title} description={article.data.description}>
