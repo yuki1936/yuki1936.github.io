@@ -10,6 +10,7 @@ const pages = [
   "/tools/dns/",
   "/tools/json/",
   "/tools/image/",
+  "/tools/blurhash/",
   "/tools/convert/",
   "/about/",
 ];
@@ -75,6 +76,30 @@ test("image tool creates a local output", async ({ page }) => {
   await expect(page.locator("#download-slices")).toHaveAttribute("download", /-2x3\.zip$/);
   await expect(page.locator(".slice-card").first().getByRole("link", { name: "下载" }))
     .toHaveAttribute("download", /-r01-c01\.webp$/);
+});
+
+test("BlurHash tool encodes and decodes images locally", async ({ page }) => {
+  await page.goto("/tools/blurhash/");
+
+  const hash = page.locator("#blurhash-value");
+  await expect(hash).toHaveValue(/^.{28}$/);
+  await expect(page.locator("#blurhash-status")).toHaveText("内置样例");
+
+  await hash.fill("LEHV6nWB2yk8pyo0adR*.7kCMdnj");
+  await page.getByRole("button", { name: "解码此 Hash" }).click();
+  await expect(page.locator("#blurhash-status")).toHaveText("Hash 已解码");
+  await expect(page.locator("#blurhash-error")).toBeHidden();
+
+  const canvasesHavePixels = await page.locator("#blurhash-preview").evaluate((preview) =>
+    [...preview.querySelectorAll("canvas")].every((canvas) => {
+      const context = canvas.getContext("2d");
+      if (!context || canvas.width === 0 || canvas.height === 0) return false;
+      return context
+        .getImageData(0, 0, canvas.width, canvas.height)
+        .data.some((value, index) => index % 4 !== 3 && value !== 0);
+    }),
+  );
+  expect(canvasesHavePixels).toBe(true);
 });
 
 test("article tables of contents and heading permalinks follow article length", async ({ page }) => {

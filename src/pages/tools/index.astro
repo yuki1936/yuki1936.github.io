@@ -1,5 +1,5 @@
 ---
-import { Braces, FileOutput, Image as ImageIcon, Network } from "@lucide/astro";
+import { Braces, FileOutput, Image as ImageIcon, Network, ScanLine } from "@lucide/astro";
 import ToolLink from "../../components/ToolLink.astro";
 import BaseLayout from "../../layouts/BaseLayout.astro";
 ---
@@ -26,6 +26,12 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
       title="图片处理"
       description="本地完成图片裁切、缩放与格式转换。"
       icon={ImageIcon}
+    />
+    <ToolLink
+      href="/tools/blurhash/"
+      title="BlurHash 编解码"
+      description="生成、解码并比较 BlurHash 图片占位图。"
+      icon={ScanLine}
     />
     <ToolLink
       href="/tools/convert/"
