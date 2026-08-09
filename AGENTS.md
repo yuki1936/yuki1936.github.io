@@ -12,10 +12,12 @@ site. Keep all production behavior compatible with Astro's static output.
 - Start the development server: `npm run dev`
 - Type-check: `npm run check`
 - Build for production: `npm run build`
-- Run end-to-end tests: start the development server, then run
-  `npx playwright test`
+- Run end-to-end tests: run `npm run build`, start `npm run preview`, then run
+  `npx playwright test` in another shell
 
-The Playwright DNS test requires network access.
+Run the full suite against the production preview because Vite development mode
+rewrites the public markweft module URL with `?import`. The Playwright DNS test
+also requires network access.
 
 ## Architecture
 
