@@ -1,7 +1,7 @@
 type FormatName = "markdown" | "html" | "typst" | "latex";
 
 interface MarkweftModule {
-  default: () => Promise<unknown>;
+  default: (options: { module_or_path: URL }) => Promise<unknown>;
   convertDocument: (source: string, from: FormatName, to: FormatName) => string;
   detectFormat: (source: string) => FormatName;
   detectFormatDetails: (source: string) => string;
@@ -65,14 +65,26 @@ const workerScope = self as unknown as {
 let modulePromise: Promise<MarkweftModule> | undefined;
 
 function loadMarkweft(): Promise<MarkweftModule> {
-  const moduleUrl = "/wasm/markweft/markweft.js";
-  modulePromise ??= import(/* @vite-ignore */ moduleUrl).then(
-    async (module) => {
-      const markweft = module as MarkweftModule;
-      await markweft.default();
+  modulePromise ??= (async () => {
+    const moduleResponse = await fetch("/wasm/markweft/markweft.js");
+    if (!moduleResponse.ok) {
+      throw new Error(`Unable to load markweft module: HTTP ${moduleResponse.status}`);
+    }
+
+    const blobUrl = URL.createObjectURL(new Blob(
+      [await moduleResponse.text()],
+      { type: "text/javascript" },
+    ));
+    try {
+      const markweft = await import(/* @vite-ignore */ blobUrl) as MarkweftModule;
+      await markweft.default({
+        module_or_path: new URL("/wasm/markweft/markweft_bg.wasm", self.location.origin),
+      });
       return markweft;
-    },
-  );
+    } finally {
+      URL.revokeObjectURL(blobUrl);
+    }
+  })();
   return modulePromise;
 }
 

@@ -7,13 +7,28 @@ const pages = [
   "/articles/life/",
   "/articles/tech/",
   "/tools/",
-  "/tools/dns/",
-  "/tools/json/",
-  "/tools/image/",
-  "/tools/blurhash/",
-  "/tools/convert/",
+  "/tools/dns-lookup/",
+  "/tools/json-viewer/",
+  "/tools/image-processor/",
+  "/tools/blurhash-tool/",
+  "/tools/markup-converter/",
   "/about/",
 ];
+
+const toolRedirects = {
+  "/tools/dns/": "/tools/dns-lookup/",
+  "/tools/json/": "/tools/json-viewer/",
+  "/tools/image/": "/tools/image-processor/",
+  "/tools/blurhash/": "/tools/blurhash-tool/",
+  "/tools/convert/": "/tools/markup-converter/",
+} as const;
+
+test("legacy tool routes redirect to their canonical URLs", async ({ page }) => {
+  for (const [legacyPath, canonicalPath] of Object.entries(toolRedirects)) {
+    await page.goto(legacyPath);
+    await expect(page, legacyPath).toHaveURL(new RegExp(`${canonicalPath}$`));
+  }
+});
 
 test("pages render without horizontal overflow", async ({ page }) => {
   const runtimeErrors: string[] = [];
@@ -34,15 +49,37 @@ test("pages render without horizontal overflow", async ({ page }) => {
 });
 
 test("DNS query returns records", async ({ page }) => {
-  await page.goto("/tools/dns/");
-  await page.locator("#dns-name").fill("example.com");
+  await page.route("https://cloudflare-dns.com/dns-query*", async (route) => {
+    const name = new URL(route.request().url()).searchParams.get("name") ?? "";
+    if (name === "slow.example") {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    }
+    try {
+      await route.fulfill({
+        json: {
+          Status: 0,
+          AD: true,
+          CD: false,
+          Answer: [{ name: `${name}.`, type: 1, TTL: 300, data: "192.0.2.1" }],
+        },
+      });
+    } catch {
+      // The superseded request is expected to be aborted by the page.
+    }
+  });
+  await page.goto("/tools/dns-lookup/");
+  await page.locator("#dns-name").fill("slow.example");
+  await page.getByRole("button", { name: "查询" }).click();
+  await page.locator("#dns-name").fill("current.example");
   await page.getByRole("button", { name: "查询" }).click();
   await expect(page.locator("#dns-status")).toContainText("NOERROR");
-  await expect(page.locator("#dns-results tr")).not.toHaveCount(0);
+  await expect(page.locator("#dns-results")).toContainText("current.example");
+  await page.waitForTimeout(400);
+  await expect(page.locator("#dns-results")).not.toContainText("slow.example");
 });
 
 test("JSON viewer renders a tree and generates Rust and Go types", async ({ page }) => {
-  await page.goto("/tools/json/");
+  await page.goto("/tools/json-viewer/");
   await page.locator("#json-input").fill(
     '{"name":"neri","active":true,"items":[{"id":1,"label":"one"},{"id":2}]}',
   );
@@ -57,10 +94,25 @@ test("JSON viewer renders a tree and generates Rust and Go types", async ({ page
   await page.getByRole("tab", { name: "Go", exact: true }).click();
   await expect(page.locator("#go-output")).toContainText("type Root struct");
   await expect(page.locator("#go-output")).toContainText('json:"items"');
+
+  await page.locator("#json-input").fill(
+    '{"foo-bar":{"a":1},"foo_bar":{"b":"x"},"a`b":true,"control\\u0000key":1}',
+  );
+  await page.getByRole("button", { name: "解析", exact: true }).click();
+  await page.getByRole("tab", { name: "Rust" }).click();
+  await expect(page.locator("#rust-output")).toContainText("foo_bar: RootFooBar");
+  await expect(page.locator("#rust-output")).toContainText("foo_bar_2: RootFooBar2");
+  await expect(page.locator("#rust-output")).toContainText(
+    'rename = "control\\u{0}key"',
+  );
+  await page.getByRole("tab", { name: "Go", exact: true }).click();
+  await expect(page.locator("#go-output")).toContainText("FooBar RootFooBar");
+  await expect(page.locator("#go-output")).toContainText("FooBar2 RootFooBar2");
+  await expect(page.locator("#go-output")).toContainText('"json:\\"a`b\\""');
 });
 
 test("image tool creates a local output", async ({ page }) => {
-  await page.goto("/tools/image/");
+  await page.goto("/tools/image-processor/");
   await page.locator("#image-input").setInputFiles(path.resolve("public/avatar.jpg"));
   await expect(page.locator("#image-workspace")).toBeVisible();
   await page.getByRole("button", { name: "生成图片" }).click();
@@ -78,8 +130,29 @@ test("image tool creates a local output", async ({ page }) => {
     .toHaveAttribute("download", /-r01-c01\.webp$/);
 });
 
+test("image tool rejects oversized files and dimensions", async ({ page }) => {
+  await page.goto("/tools/image-processor/");
+  await page.locator("#image-input").setInputFiles({
+    name: "too-large.jpg",
+    mimeType: "image/jpeg",
+    buffer: Buffer.alloc(25 * 1024 * 1024 + 1),
+  });
+  await expect(page.locator("#image-status")).toHaveText("图片不能超过 25 MiB");
+  await expect(page.locator("#image-workspace")).toBeHidden();
+
+  await page.locator("#image-input").setInputFiles({
+    name: "too-many-pixels.svg",
+    mimeType: "image/svg+xml",
+    buffer: Buffer.from(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="5001" height="5000"></svg>',
+    ),
+  });
+  await expect(page.locator("#image-status")).toHaveText("图片不能超过 2500 万像素");
+  await expect(page.locator("#image-workspace")).toBeHidden();
+});
+
 test("BlurHash tool encodes and decodes images locally", async ({ page }) => {
-  await page.goto("/tools/blurhash/");
+  await page.goto("/tools/blurhash-tool/");
 
   const hash = page.locator("#blurhash-value");
   await expect(hash).toHaveValue(/^.{28}$/);
@@ -130,7 +203,7 @@ test("article tables of contents and heading permalinks follow article length", 
 });
 
 test("document converter runs the Rust Wasm format matrix", async ({ page }) => {
-  await page.goto("/tools/convert/");
+  await page.goto("/tools/markup-converter/");
   await expect(page.locator("#convert-status")).toHaveText("转换器已就绪", {
     timeout: 15_000,
   });
@@ -219,7 +292,7 @@ test("document converter runs the Rust Wasm format matrix", async ({ page }) => 
 });
 
 test("document converter rejects oversized imports and accepts drops", async ({ page }) => {
-  await page.goto("/tools/convert/");
+  await page.goto("/tools/markup-converter/");
   await expect(page.locator("#convert-status")).toHaveText("转换器已就绪", { timeout: 15_000 });
   await page.locator("#document-file").setInputFiles({
     name: "large.md",
@@ -248,7 +321,7 @@ test("visual snapshots", async ({ page }) => {
 
   const sample = '{"name":"neri","active":true,"languages":["Rust","Python","Go","TypeScript"],"profile":{"location":"China","public":true}}';
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.goto("/tools/json/");
+  await page.goto("/tools/json-viewer/");
   await page.locator("#json-input").fill(sample);
   await page.getByRole("button", { name: "解析", exact: true }).click();
   await page.screenshot({ path: "artifacts/json-viewer-desktop.png", fullPage: true });
@@ -257,7 +330,7 @@ test("visual snapshots", async ({ page }) => {
   await page.screenshot({ path: "artifacts/json-viewer-mobile.png", fullPage: true });
 
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.goto("/tools/image/");
+  await page.goto("/tools/image-processor/");
   await page.locator("#image-input").setInputFiles(path.resolve("public/avatar.jpg"));
   await page.getByRole("button", { name: "等分", exact: true }).click();
   await page.getByRole("button", { name: "3 × 3" }).click();
@@ -269,7 +342,7 @@ test("visual snapshots", async ({ page }) => {
   await page.screenshot({ path: "artifacts/image-split-mobile.png", fullPage: true });
 
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.goto("/tools/convert/");
+  await page.goto("/tools/markup-converter/");
   await expect(page.locator("#convert-status")).toHaveText("转换器已就绪", { timeout: 15_000 });
   await page.locator(".converter-options summary").click();
   await page.locator("#example-input").selectOption("markdown");

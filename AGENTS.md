@@ -15,9 +15,8 @@ site. Keep all production behavior compatible with Astro's static output.
 - Run end-to-end tests: run `npm run build`, start `npm run preview`, then run
   `npx playwright test` in another shell
 
-Run the full suite against the production preview because Vite development mode
-rewrites the public markweft module URL with `?import`. The Playwright DNS test
-also requires network access.
+Run the full suite against the production preview. Playwright intercepts the DNS
+provider, so end-to-end tests do not depend on external network availability.
 
 ## Architecture
 
@@ -47,6 +46,43 @@ also requires network access.
 - Avoid unrelated refactors, especially when editing the larger tool pages.
 - Preserve unrelated working-tree changes.
 
+## Tool Routes
+
+The canonical tool routes are:
+
+- `/tools/dns-lookup/`
+- `/tools/json-viewer/`
+- `/tools/image-processor/`
+- `/tools/blurhash-tool/`
+- `/tools/markup-converter/`
+
+Keep internal links and Playwright navigation on these canonical routes. When a
+public route is renamed, retain its previous path in `astro.config.mjs` as a
+redirect and add redirect coverage before removing the old URL.
+
+Tool implementation sources are intentionally different:
+
+- BlurHash logic mirrors `https://github.com/yuki1936/BlurHash`; keep
+  `src/lib/blurhash.ts` behavior synchronized with its TypeScript package.
+- Markup conversion loads generated WebAssembly from
+  `https://github.com/yuki1936/markweft-rs`. Its Worker fetches the generated
+  JavaScript and imports it through a Blob URL so both Vite development mode and
+  static production can load files kept under `public/`.
+- DNS Lookup calls Cloudflare DNS-over-HTTPS directly. It does not embed or call
+  the `rdig` repository.
+- JSON Viewer and Image Processor are implemented directly in this repository;
+  their current browser code does not import another repository at runtime.
+
+Preserve these tool safety invariants:
+
+- Generated Rust and Go type and field identifiers must remain unique after
+  normalization, and arbitrary JSON keys must produce valid string literals and
+  serialization tags.
+- Image Processor rejects files above 25 MiB and decoded images above 25 million
+  pixels. Do not raise either limit without memory-focused browser coverage.
+- DNS Lookup aborts a superseded request, times out after 10 seconds, and only
+  lets the current request update results.
+
 ## Articles
 
 Article frontmatter is validated by `src/content.config.ts`:
@@ -68,6 +104,10 @@ Do not manually edit files in `public/wasm/markweft/`. Regenerate them with
 `scripts/update-markweft-wasm.sh`. The script expects the `markweft-rs`
 repository at `../../markweft-rs`, or at the path specified by
 `MARKWEFT_RS_DIR`.
+
+The markweft-rs CI installs a `wasm-bindgen` CLI version matching its
+`Cargo.lock`. When that dependency changes, update the workflow tool version,
+build the Wasm package, and refresh the checked-in blog assets together.
 
 ## Verification
 

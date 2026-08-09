@@ -5,7 +5,7 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
 
 <BaseLayout title="图片处理" description="在浏览器本地裁切、缩放和压缩图片。" wide>
   <header class="tool-header">
-    <p class="eyebrow">Tools / Image</p>
+    <p class="eyebrow">Tools / Image Processor</p>
     <h1>图片处理</h1>
     <p class="lede">图片不会离开当前设备。</p>
   </header>
@@ -132,6 +132,9 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
   }
 
   type ProcessMode = "crop" | "split";
+
+  const MAX_IMAGE_BYTES = 25 * 1024 * 1024;
+  const MAX_IMAGE_PIXELS = 25_000_000;
 
   const fileInput = document.querySelector<HTMLInputElement>("#image-input");
   const uploadZone = document.querySelector<HTMLElement>("#upload-zone");
@@ -289,17 +292,37 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
     });
   }
 
+  function rejectSource(message: string) {
+    sourceFile = null;
+    if (sourceUrl) URL.revokeObjectURL(sourceUrl);
+    sourceUrl = "";
+    if (sourceImage) {
+      sourceImage.onload = null;
+      sourceImage.onerror = null;
+      sourceImage.removeAttribute("src");
+    }
+    if (fileInput) fileInput.value = "";
+    if (workspace) workspace.hidden = true;
+    clearOutput();
+    setStatus(message, "error");
+  }
+
   function loadFile(file: File) {
     if (!file.type.startsWith("image/")) {
-      setStatus("请选择有效的图片文件", "error");
-      return;
+      return rejectSource("请选择有效的图片文件");
     }
+    if (file.size > MAX_IMAGE_BYTES) return rejectSource("图片不能超过 25 MiB");
     sourceFile = file;
     if (sourceUrl) URL.revokeObjectURL(sourceUrl);
     sourceUrl = URL.createObjectURL(file);
     if (!sourceImage) return;
     sourceImage.src = sourceUrl;
     sourceImage.onload = () => {
+      const pixelCount = sourceImage.naturalWidth * sourceImage.naturalHeight;
+      if (!Number.isSafeInteger(pixelCount) || pixelCount > MAX_IMAGE_PIXELS) {
+        rejectSource("图片不能超过 2500 万像素");
+        return;
+      }
       if (workspace) workspace.hidden = false;
       setCrop({
         x: 0,
@@ -312,7 +335,7 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
       updateGridOverlay();
       setStatus(`${sourceImage.naturalWidth} × ${sourceImage.naturalHeight} · ${formatBytes(file.size)}`);
     };
-    sourceImage.onerror = () => setStatus("无法读取这张图片", "error");
+    sourceImage.onerror = () => rejectSource("无法读取这张图片");
   }
 
   fileInput?.addEventListener("change", () => {

@@ -5,7 +5,7 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
 
 <BaseLayout title="DNS 查询" description="通过 DNS-over-HTTPS 查询常见 DNS 记录。" wide>
   <header class="tool-header">
-    <p class="eyebrow">Tools / DNS</p>
+    <p class="eyebrow">Tools / DNS Lookup</p>
     <h1>DNS 查询</h1>
     <p class="lede">查询通过 Cloudflare DNS-over-HTTPS 完成。</p>
   </header>
@@ -102,6 +102,8 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
   const status = document.querySelector<HTMLElement>("#dns-status");
   const flags = document.querySelector<HTMLElement>("#dns-flags");
   const results = document.querySelector<HTMLTableSectionElement>("#dns-results");
+  const QUERY_TIMEOUT_MS = 10_000;
+  let activeQuery: AbortController | undefined;
 
   function setStatus(message: string, state = "") {
     if (!status) return;
@@ -116,10 +118,18 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
 
   form?.addEventListener("submit", async (event) => {
     event.preventDefault();
-    const name = nameInput?.value.trim().replace(/^https?:\/\//, "").split("/")[0];
+    const name = nameInput?.value.trim().replace(/^https?:\/\//i, "").split("/")[0];
     const type = typeInput?.value ?? "A";
     if (!name || !results || !flags) return;
 
+    activeQuery?.abort();
+    const controller = new AbortController();
+    activeQuery = controller;
+    let timedOut = false;
+    const timeout = window.setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, QUERY_TIMEOUT_MS);
     setStatus("正在查询…");
     flags.textContent = "";
 
@@ -128,10 +138,12 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
       endpoint.search = new URLSearchParams({ name, type, do: "true" }).toString();
       const response = await fetch(endpoint, {
         headers: { Accept: "application/dns-json" },
+        signal: controller.signal,
       });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
       const data = (await response.json()) as DnsResponse;
+      if (activeQuery !== controller) return;
       const answers = data.Answer ?? data.Authority ?? [];
       results.replaceChildren();
 
@@ -155,8 +167,15 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
       setStatus(`${responseName} · ${answers.length} 条记录`, data.Status === 0 ? "success" : "error");
       flags.textContent = data.AD ? "DNSSEC 已验证" : "DNSSEC 未验证";
     } catch (error) {
+      if (activeQuery !== controller) return;
       results.innerHTML = '<tr class="placeholder-row"><td colspan="4">查询失败</td></tr>';
-      setStatus(error instanceof Error ? error.message : "查询失败", "error");
+      setStatus(
+        timedOut ? "查询超时" : error instanceof Error ? error.message : "查询失败",
+        "error",
+      );
+    } finally {
+      window.clearTimeout(timeout);
+      if (activeQuery === controller) activeQuery = undefined;
     }
   });
 </script>

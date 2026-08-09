@@ -52,6 +52,42 @@ function toSnakeCase(value: string): string {
   return rustReserved.has(safe) ? `${safe}_field` : safe;
 }
 
+function reserveUnique(
+  candidate: string,
+  used: Set<string>,
+  separator = "",
+): string {
+  let result = candidate;
+  let suffix = 2;
+  while (used.has(result)) {
+    result = `${candidate}${separator}${suffix}`;
+    suffix += 1;
+  }
+  used.add(result);
+  return result;
+}
+
+function rustStringLiteral(value: string): string {
+  let result = '"';
+  for (const character of value) {
+    const codePoint = character.codePointAt(0)!;
+    if (character === "\\") result += "\\\\";
+    else if (character === '"') result += '\\"';
+    else if (character === "\n") result += "\\n";
+    else if (character === "\r") result += "\\r";
+    else if (character === "\t") result += "\\t";
+    else if (codePoint < 0x20 || codePoint === 0x7f) {
+      result += `\\u{${codePoint.toString(16)}}`;
+    } else result += character;
+  }
+  return `${result}"`;
+}
+
+function goStructTag(key: string, omitEmpty: boolean): string {
+  const tag = `json:${JSON.stringify(`${key}${omitEmpty ? ",omitempty" : ""}`)}`;
+  return tag.includes("`") ? JSON.stringify(tag) : `\`${tag}\``;
+}
+
 function inferValues(values: unknown[], name: string): JsonSchema {
   const hasNull = values.some((value) => value === null);
   const nonNull = values.filter((value) => value !== null);
@@ -103,7 +139,20 @@ function inferValues(values: unknown[], name: string): JsonSchema {
 }
 
 export function inferJsonSchema(value: unknown): JsonSchema {
-  return inferValues([value], "Root");
+  const schema = inferValues([value], "Root");
+  const usedNames = new Set<string>();
+
+  function assignUniqueObjectNames(current: JsonSchema): void {
+    if (current.kind === "object") {
+      current.name = reserveUnique(current.name ?? "Value", usedNames);
+      for (const field of current.fields ?? []) assignUniqueObjectNames(field.schema);
+    } else if (current.kind === "array" && current.item) {
+      assignUniqueObjectNames(current.item);
+    }
+  }
+
+  assignUniqueObjectNames(schema);
+  return schema;
 }
 
 function collectObjects(schema: JsonSchema, result: JsonSchema[] = []): JsonSchema[] {
@@ -134,11 +183,12 @@ function rustType(schema: JsonSchema): string {
 }
 
 function renderRustStruct(schema: JsonSchema): string {
+  const usedNames = new Set<string>();
   const fields = (schema.fields ?? []).flatMap(({ key, schema: field }) => {
-    const identifier = toSnakeCase(key);
+    const identifier = reserveUnique(toSnakeCase(key), usedNames, "_");
     const attributes = identifier === key
       ? []
-      : [`    #[serde(rename = ${JSON.stringify(key)})]`];
+      : [`    #[serde(rename = ${rustStringLiteral(key)})]`];
     return [...attributes, `    pub ${identifier}: ${rustType(field)},`];
   });
   return [
@@ -177,10 +227,10 @@ function goType(schema: JsonSchema): string {
 }
 
 function renderGoStruct(schema: JsonSchema): string {
+  const usedNames = new Set<string>();
   const fields = (schema.fields ?? []).map(({ key, schema: field }) => {
-    const fieldName = toPascalCase(key);
-    const omitEmpty = field.optional ? ",omitempty" : "";
-    const tag = key.includes("`") ? "" : ` \`json:"${key}${omitEmpty}"\``;
+    const fieldName = reserveUnique(toPascalCase(key), usedNames);
+    const tag = ` ${goStructTag(key, field.optional)}`;
     return `    ${fieldName} ${goType(field)}${tag}`;
   });
   return [`type ${schema.name} struct {`, ...fields, "}"].join("\n");
