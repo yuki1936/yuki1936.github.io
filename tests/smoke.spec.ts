@@ -30,6 +30,45 @@ test("legacy tool routes redirect to their canonical URLs", async ({ page }) => 
   }
 });
 
+test("sitemap exposes canonical routes and excludes legacy redirects", async ({ request }) => {
+  const homeResponse = await request.get("/");
+  expect(homeResponse.ok()).toBe(true);
+  await expect(homeResponse.text()).resolves.toContain(
+    '<link rel="canonical" href="https://yuki1936.github.io/">',
+  );
+
+  const indexResponse = await request.get("/sitemap-index.xml");
+  expect(indexResponse.ok()).toBe(true);
+  await expect(indexResponse.text()).resolves.toContain(
+    "https://yuki1936.github.io/sitemap-0.xml",
+  );
+
+  const sitemapResponse = await request.get("/sitemap-0.xml");
+  expect(sitemapResponse.ok()).toBe(true);
+  const sitemap = await sitemapResponse.text();
+  for (const canonicalPath of [
+    "/articles/",
+    "/articles/life/2026-8-3-songs-i-listen-to/",
+    "/tools/dns-lookup/",
+    "/tools/json-viewer/",
+    "/tools/image-processor/",
+    "/tools/blurhash-tool/",
+    "/tools/markup-converter/",
+  ]) {
+    expect(sitemap).toContain(`https://yuki1936.github.io${canonicalPath}`);
+  }
+  for (const legacyPath of Object.keys(toolRedirects)) {
+    expect(sitemap).not.toContain(`https://yuki1936.github.io${legacyPath}`);
+  }
+  expect(sitemap).not.toContain("https://yuki1936.github.io/404");
+
+  const robotsResponse = await request.get("/robots.txt");
+  expect(robotsResponse.ok()).toBe(true);
+  await expect(robotsResponse.text()).resolves.toContain(
+    "Sitemap: https://yuki1936.github.io/sitemap-index.xml",
+  );
+});
+
 test("pages render without horizontal overflow", async ({ page }) => {
   const runtimeErrors: string[] = [];
   page.on("pageerror", (error) => runtimeErrors.push(error.message));

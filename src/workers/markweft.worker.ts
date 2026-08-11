@@ -1,9 +1,13 @@
-type FormatName = "markdown" | "html" | "typst" | "latex";
+import type {
+  ConversionDiagnostic,
+  ConversionOptions,
+  FormatName,
+  MarkweftWorkerRequest,
+  MarkweftWorkerResponse,
+} from "../lib/markup-converter";
 
 interface MarkweftModule {
   default: (options: { module_or_path: URL }) => Promise<unknown>;
-  convertDocument: (source: string, from: FormatName, to: FormatName) => string;
-  detectFormat: (source: string) => FormatName;
   detectFormatDetails: (source: string) => string;
   convertDocumentWithReport: (
     source: string,
@@ -13,52 +17,11 @@ interface MarkweftModule {
   ) => string;
 }
 
-interface ConversionOptions {
-  mode: "strict" | "compatible";
-  full_html_document: boolean;
-  document_title?: string;
-  link_prefix?: string;
-  image_prefix?: string;
-}
-
-interface Diagnostic {
-  severity: "info" | "warning" | "error";
-  code: string;
-  message: string;
-  line?: number;
-  column?: number;
-}
-
-type WorkerRequest =
-  | { type: "init" }
-  | {
-      type: "convert";
-      id: number;
-      source: string;
-      from: FormatName | "auto";
-      to: FormatName;
-      options: ConversionOptions;
-    };
-
-type WorkerResponse =
-  | { type: "ready" }
-  | {
-      type: "result";
-      id: number;
-      output: string;
-      previewHtml: string;
-      astJson: string;
-      diagnostics: Diagnostic[];
-      detectedFormat: FormatName;
-      confidence: number;
-    }
-  | { type: "error"; id?: number; message: string };
-
 const workerScope = self as unknown as {
-  postMessage: (message: WorkerResponse) => void;
+  postMessage: (message: MarkweftWorkerResponse) => void;
   addEventListener: (
     type: "message",
-    listener: (event: MessageEvent<WorkerRequest>) => void,
+    listener: (event: MessageEvent<MarkweftWorkerRequest>) => void,
   ) => void;
 };
 
@@ -109,7 +72,7 @@ workerScope.addEventListener("message", async ({ data }) => {
     )) as {
       output: string;
       document: unknown;
-      diagnostics: Diagnostic[];
+      diagnostics: ConversionDiagnostic[];
     };
     const output = report.output;
     let previewHtml = data.to === "html" ? output : "";

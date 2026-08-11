@@ -14,6 +14,7 @@ const {
   wide = false,
 } = Astro.props;
 const pageTitle = title ? `${title} · neri` : "neri";
+const canonicalUrl = new URL(Astro.url.pathname, Astro.site);
 ---
 
 <!doctype html>
@@ -24,6 +25,8 @@ const pageTitle = title ? `${title} · neri` : "neri";
     <meta name="description" content={description} />
     <meta name="theme-color" content="#101211" />
     <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="canonical" href={canonicalUrl} />
+    <link rel="sitemap" href="/sitemap-index.xml" />
     <title>{pageTitle}</title>
   </head>
   <body>
