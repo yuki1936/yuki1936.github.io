@@ -49,6 +49,7 @@ const minutes = readingMinutes(article.body ?? "");
   title={article.data.title}
   description={article.data.description}
   ogType="article"
+  wide
 >
   <article>
     <header class="article-header">
@@ -156,6 +157,10 @@ const minutes = readingMinutes(article.body ?? "");
 </script>
 
 <style>
+  article {
+    max-width: 720px;
+  }
+
   .article-header {
     margin-bottom: 58px;
     padding-bottom: 30px;

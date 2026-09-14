@@ -3,7 +3,7 @@ import { CodeXml, Mail, MessageSquare } from "@lucide/astro";
 import BaseLayout from "../layouts/BaseLayout.astro";
 ---
 
-<BaseLayout title="关于" description="关于 yuki1936，也叫 neri。">
+<BaseLayout title="关于" description="关于 yuki1936，也叫 neri。" wide>
   <div class="about-layout">
     <img class="avatar" src="/avatar.jpg" alt="yuki1936 的头像" width="128" height="128" />
     <div>
@@ -38,6 +38,7 @@ import BaseLayout from "../layouts/BaseLayout.astro";
     grid-template-columns: 128px minmax(0, 1fr);
     align-items: start;
     gap: 38px;
+    max-width: 720px;
   }
 
   .avatar {

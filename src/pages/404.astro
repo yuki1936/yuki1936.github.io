@@ -2,7 +2,7 @@
 import BaseLayout from "../layouts/BaseLayout.astro";
 ---
 
-<BaseLayout title="页面不存在">
+<BaseLayout title="页面不存在" wide>
   <section class="not-found">
     <p class="eyebrow">404</p>
     <h1>这里什么也没有。</h1>
@@ -12,6 +12,10 @@ import BaseLayout from "../layouts/BaseLayout.astro";
 </BaseLayout>
 
 <style>
+  .not-found {
+    max-width: 720px;
+  }
+
   .not-found .tool-button {
     margin-top: 28px;
     text-decoration: none;
