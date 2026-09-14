@@ -7,32 +7,49 @@ import {
   formatDate,
   getArticleCategory,
   getArticleSlug,
+  readingMinutes,
+  sortArticles,
   type Article,
 } from "../../../lib/articles";
 
 export async function getStaticPaths() {
-  const articles = await getCollection("articles", ({ data }) => !data.draft);
-  return articles.map((article) => {
+  const all = await getCollection("articles", ({ data }) => !data.draft);
+  return all.map((article) => {
     const [category, slug] = getArticleSlug(article).split("/");
+    const siblings = sortArticles(
+      all.filter((candidate) => getArticleCategory(candidate) === category),
+    );
+    const index = siblings.findIndex((candidate) => candidate.id === article.id);
     return {
       params: { category, slug },
-      props: { article },
+      props: {
+        article,
+        newer: siblings[index - 1] ?? null,
+        older: siblings[index + 1] ?? null,
+      },
     };
   });
 }
 
 interface Props {
   article: Article;
+  newer: Article | null;
+  older: Article | null;
 }
 
-const { article } = Astro.props;
+const { article, newer, older } = Astro.props;
 const category = getArticleCategory(article);
 const { Content, headings } = await render(article);
 const tocItems = headings.filter((heading) => heading.depth === 2);
 const showToc = tocItems.length >= 2;
+const minutes = readingMinutes(article.body ?? "");
 ---
 
-<BaseLayout title={article.data.title} description={article.data.description}>
+<BaseLayout
+  title={article.data.title}
+  description={article.data.description}
+  ogType="article"
+>
   <article>
     <header class="article-header">
       <a class="article-category" href={`/articles/${category}/`}>
@@ -55,6 +72,7 @@ const showToc = tocItems.length >= 2;
             </time>
           )
         }
+        <span>约 {minutes} 分钟</span>
       </div>
     </header>
     {
@@ -90,6 +108,28 @@ const showToc = tocItems.length >= 2;
     <div class="prose">
       <Content />
     </div>
+    {
+      (older || newer) && (
+        <nav class="article-neighbors" aria-label="相邻文章">
+          {older ? (
+            <a class="neighbor" href={`/articles/${getArticleSlug(older)}/`}>
+              <small>上一篇</small>
+              <span>{older.data.title}</span>
+            </a>
+          ) : (
+            <span class="neighbor neighbor-empty" aria-hidden="true" />
+          )}
+          {newer ? (
+            <a class="neighbor neighbor-next" href={`/articles/${getArticleSlug(newer)}/`}>
+              <small>下一篇</small>
+              <span>{newer.data.title}</span>
+            </a>
+          ) : (
+            <span class="neighbor neighbor-empty" aria-hidden="true" />
+          )}
+        </nav>
+      )
+    }
     <template id="heading-anchor-template">
       <a class="heading-anchor" title="此节链接">
         <Link2 size={15} stroke-width={1.8} aria-hidden="true" />
@@ -225,6 +265,54 @@ const showToc = tocItems.length >= 2;
     color: var(--accent-strong);
   }
 
+  .article-neighbors {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-top: 58px;
+    padding-top: 26px;
+    border-top: 1px solid var(--border);
+  }
+
+  .neighbor {
+    display: grid;
+    align-content: start;
+    gap: 5px;
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    text-decoration: none;
+  }
+
+  .neighbor:hover {
+    border-color: var(--border-strong);
+  }
+
+  .neighbor small {
+    color: var(--faint);
+    font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+    font-size: 0.72rem;
+  }
+
+  .neighbor span {
+    color: var(--text);
+    font-size: 0.92rem;
+    font-weight: 600;
+    line-height: 1.45;
+  }
+
+  .neighbor:hover span {
+    color: var(--accent-strong);
+  }
+
+  .neighbor-next {
+    text-align: right;
+  }
+
+  .neighbor-empty {
+    visibility: hidden;
+  }
+
   @media (max-width: 640px) {
     .article-header h1 {
       font-size: 1.65rem;
@@ -232,6 +320,18 @@ const showToc = tocItems.length >= 2;
 
     .article-toc {
       margin-bottom: 46px;
+    }
+
+    .article-neighbors {
+      grid-template-columns: 1fr;
+    }
+
+    .neighbor-empty {
+      display: none;
+    }
+
+    .neighbor-next {
+      text-align: left;
     }
   }
 </style>

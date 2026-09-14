@@ -1,0 +1,109 @@
+---
+import { ArrowUpRight } from "@lucide/astro";
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { friendLinks } from "../lib/friend-links";
+---
+
+<BaseLayout title="友链" description="朋友的站点。">
+  <header class="page-header">
+    <p class="eyebrow">Links</p>
+    <h1>友链</h1>
+    <p class="lede">一些我喜欢的站点。想交换友链可以联系我。</p>
+  </header>
+
+  <ul class="link-list">
+    {
+      friendLinks.map((link) => (
+        <li>
+          <a href={link.url}>
+            {link.avatar ? (
+              <img class="link-avatar" src={link.avatar} alt="" width="40" height="40" loading="lazy" />
+            ) : (
+              <span class="link-avatar link-fallback" aria-hidden="true">
+                {link.name.slice(0, 1)}
+              </span>
+            )}
+            <span class="link-copy">
+              <strong>{link.name}</strong>
+              <small>{link.description}</small>
+            </span>
+            <ArrowUpRight size={16} stroke-width={1.8} class="link-arrow" aria-hidden="true" />
+          </a>
+        </li>
+      ))
+    }
+  </ul>
+</BaseLayout>
+
+<style>
+  .page-header {
+    margin-bottom: 42px;
+  }
+
+  .link-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .link-list a {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding-block: 16px;
+    border-bottom: 1px solid var(--border);
+    text-decoration: none;
+  }
+
+  .link-list a:hover strong {
+    color: var(--accent-strong);
+  }
+
+  .link-avatar {
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+    border: 1px solid var(--border);
+    border-radius: 9999px;
+    object-fit: cover;
+  }
+
+  .link-fallback {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+    background: var(--surface);
+    font-weight: 650;
+  }
+
+  .link-copy {
+    display: grid;
+    min-width: 0;
+    gap: 3px;
+  }
+
+  .link-copy strong {
+    color: var(--text);
+    font-weight: 650;
+  }
+
+  .link-copy small {
+    overflow: hidden;
+    color: var(--muted);
+    font-size: 0.82rem;
+    line-height: 1.5;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .link-arrow {
+    margin-left: auto;
+    color: var(--faint);
+    flex-shrink: 0;
+  }
+
+  .link-list a:hover .link-arrow {
+    color: var(--text);
+  }
+</style>

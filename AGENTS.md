@@ -39,7 +39,9 @@ provider, so end-to-end tests do not depend on external network availability.
   Tailwind, or another UI framework unless explicitly requested.
 - Reuse the colors, spacing, widths, controls, and typography defined in
   `src/styles/global.css`.
-- Preserve the restrained dark visual style and existing responsive behavior.
+- Preserve the shadcn-style monochrome visual system: zinc tokens, light and
+  dark themes driven by the `.dark` class on `<html>` (inline no-flash script in
+  BaseLayout, toggle in Header), no colored accents except `--danger` for errors.
 - Use Lucide icons through `@lucide/astro`.
 - Keep browser tools local-first. User files and JSON must not be uploaded. DNS
   lookup is the intentional network-backed exception.
@@ -56,6 +58,9 @@ The canonical tool routes are:
 - `/tools/image-processor/`
 - `/tools/blurhash-tool/`
 - `/tools/markup-converter/`
+
+Other public routes: `/articles/`, `/links/` (friend links, data in
+`src/lib/friend-links.ts`), `/about/`, and `/rss.xml` (feed via `@astrojs/rss`).
 
 Keep internal links and Playwright navigation on these canonical routes. When a
 public route is renamed, retain its previous path in `astro.config.mjs` as a

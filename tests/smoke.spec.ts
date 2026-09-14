@@ -12,6 +12,7 @@ const pages = [
   "/tools/image-processor/",
   "/tools/blurhash-tool/",
   "/tools/markup-converter/",
+  "/links/",
   "/about/",
 ];
 
@@ -36,6 +37,11 @@ test("sitemap exposes canonical routes and excludes legacy redirects", async ({ 
   await expect(homeResponse.text()).resolves.toContain(
     '<link rel="canonical" href="https://yuki1936.com/">',
   );
+  await expect(homeResponse.text()).resolves.toContain('property="og:title"');
+
+  const rssResponse = await request.get("/rss.xml");
+  expect(rssResponse.ok()).toBe(true);
+  await expect(rssResponse.text()).resolves.toContain("<rss");
 
   const indexResponse = await request.get("/sitemap-index.xml");
   expect(indexResponse.ok()).toBe(true);
@@ -215,6 +221,7 @@ test("BlurHash tool encodes and decodes images locally", async ({ page }) => {
 });
 
 test("article tables of contents and heading permalinks follow article length", async ({ page }) => {
+  await page.emulateMedia({ colorScheme: "light" });
   await page.goto("/articles/life/2026-8-3-songs-i-listen-to/");
   const toc = page.locator(".article-toc");
   await expect(toc).toBeVisible();
@@ -229,7 +236,7 @@ test("article tables of contents and heading permalinks follow article length", 
   await flowerHeading.hover();
   await flowerHeading.getByRole("link", { name: /链接到/ }).click();
   await expect(page).toHaveURL(/#flower-dance--dj-okawari$/);
-  await expect(flowerHeading).toHaveCSS("color", "rgb(179, 223, 191)");
+  await expect(flowerHeading).toHaveCSS("color", "rgb(9, 9, 11)");
 
   await page.goto(
     "/articles/tech/2023-10-1-oct-leetcoding-challenge-rust-solution/",
@@ -349,8 +356,40 @@ test("document converter rejects oversized imports and accepts drops", async ({ 
   await expect(page.locator("#source-format")).toHaveValue("markdown");
 });
 
+test("theme toggle switches and persists the dark theme", async ({ page }) => {
+  await page.emulateMedia({ colorScheme: "light" });
+  await page.goto("/");
+  await expect(page.locator("html")).not.toHaveClass(/dark/);
+  await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute("content", "#ffffff");
+
+  await page.getByRole("button", { name: "切换到深色主题" }).click();
+  await expect(page.locator("html")).toHaveClass(/dark/);
+  await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute("content", "#09090b");
+  await expect(page.locator("body")).toHaveCSS("background-color", "rgb(9, 9, 11)");
+  expect(await page.evaluate(() => localStorage.getItem("theme"))).toBe("dark");
+
+  await page.reload();
+  await expect(page.locator("html")).toHaveClass(/dark/);
+
+  await page.getByRole("button", { name: "切换到浅色主题" }).click();
+  expect(await page.evaluate(() => localStorage.getItem("theme"))).toBe("light");
+  await expect(page.locator("html")).not.toHaveClass(/dark/);
+});
+
+test("prefers-color-scheme dark applies dark before first paint", async ({ page }) => {
+  await page.emulateMedia({ colorScheme: "dark" });
+  await page.goto("/");
+  await expect(page.locator("html")).toHaveClass(/dark/);
+  await expect(page.locator("body")).toHaveCSS("background-color", "rgb(9, 9, 11)");
+  expect(await page.evaluate(() => localStorage.getItem("theme"))).toBeNull();
+});
+
 test("visual snapshots", async ({ page }) => {
+  await page.emulateMedia({ colorScheme: "dark" });
   await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto("/");
+  await page.screenshot({ path: "artifacts/home-desktop-dark.png", fullPage: true });
+  await page.emulateMedia({ colorScheme: "light" });
   await page.goto("/");
   await page.screenshot({ path: "artifacts/home-desktop.png", fullPage: true });
 

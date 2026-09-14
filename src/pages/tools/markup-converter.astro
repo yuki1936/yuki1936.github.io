@@ -589,9 +589,9 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
   .conversion-diagnostics {
     margin: -4px 0 14px;
     padding: 9px 12px;
-    border-left: 2px solid #b7954b;
+    border-left: 2px solid var(--border-strong);
     color: var(--muted);
-    background: #171811;
+    background: var(--surface);
     font-size: 0.74rem;
   }
 
@@ -707,7 +707,7 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
     min-height: 520px;
     border: 0;
     border-radius: 0;
-    background: #0e110f;
+    background: var(--bg);
     resize: vertical;
   }
 
@@ -720,7 +720,7 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
   }
 
   #document-output {
-    color: #d8dcd9;
+    color: var(--text);
   }
 
   .document-preview {
@@ -728,7 +728,7 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
     width: 100%;
     min-height: 520px;
     border: 0;
-    background: #0e110f;
+    background: #ffffff;
   }
 
   .document-preview[hidden] {

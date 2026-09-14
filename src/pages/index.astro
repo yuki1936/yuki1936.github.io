@@ -1,10 +1,10 @@
 ---
 import { getCollection } from "astro:content";
-import { Braces, FileOutput, Image as ImageIcon, Network } from "@lucide/astro";
+import { Braces, CodeXml, FileOutput, Image as ImageIcon, Network, Rss } from "@lucide/astro";
 import ArticleList from "../components/ArticleList.astro";
 import ToolLink from "../components/ToolLink.astro";
 import BaseLayout from "../layouts/BaseLayout.astro";
-import { categoryMeta, sortArticles } from "../lib/articles";
+import { sortArticles } from "../lib/articles";
 
 const articles = sortArticles(
   await getCollection("articles", ({ data }) => !data.draft),
@@ -12,37 +12,34 @@ const articles = sortArticles(
 ---
 
 <BaseLayout wide>
-  <section class="intro">
-    <p class="eyebrow">yuki1936 / neri</p>
-    <p class="lede">One day, we'll all become a memory of someone else's.</p>
+  <section class="hero">
+    <img class="hero-avatar" src="/avatar.jpg" alt="yuki1936 的头像" width="96" height="96" />
+    <div class="hero-copy">
+      <h1>yuki1936</h1>
+      <p class="lede">One day, we'll all become a memory of someone else's.</p>
+      <div class="hero-links">
+        <a href="https://github.com/yuki1936">
+          <CodeXml size={17} aria-hidden="true" /> GitHub
+        </a>
+        <a href="/rss.xml">
+          <Rss size={17} aria-hidden="true" /> RSS
+        </a>
+      </div>
+    </div>
   </section>
 
-  <div class="home-grid">
-    <section class="recent">
-      <div class="section-heading">
-        <h2>最近文章</h2>
-        <a href="/articles/">全部文章</a>
-      </div>
-      <ArticleList articles={articles} />
-    </section>
+  <section class="home-section">
+    <div class="section-heading">
+      <h2>最近文章</h2>
+      <a href="/articles/">全部 →</a>
+    </div>
+    <ArticleList articles={articles} />
+  </section>
 
-    <aside class="categories" aria-label="文章分类">
-      <p class="aside-title">分类</p>
-      <a href="/articles/life/">
-        <span>{categoryMeta.life.label}</span>
-        <small>{categoryMeta.life.description}</small>
-      </a>
-      <a href="/articles/tech/">
-        <span>{categoryMeta.tech.label}</span>
-        <small>{categoryMeta.tech.description}</small>
-      </a>
-    </aside>
-  </div>
-
-  <section class="home-tools">
+  <section class="home-section">
     <div class="section-heading">
       <h2>常用工具</h2>
-      <a href="/tools/">全部工具</a>
+      <a href="/tools/">全部 →</a>
     </div>
     <div class="tool-grid">
       <ToolLink
@@ -74,51 +71,58 @@ const articles = sortArticles(
 </BaseLayout>
 
 <style>
-  .intro {
-    max-width: 820px;
-    padding-block: 24px 82px;
+  .hero {
+    display: flex;
+    align-items: flex-start;
+    gap: 28px;
+    max-width: 720px;
+    margin-inline: auto;
+    padding-block: 24px 64px;
   }
 
-  .home-grid {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 280px;
-    gap: 64px;
+  .hero-avatar {
+    width: 96px;
+    height: 96px;
+    border: 1px solid var(--border);
+    border-radius: 9999px;
+    object-fit: cover;
   }
 
-  .categories {
-    align-self: start;
-    padding-top: 2px;
-  }
-
-  .aside-title {
-    margin: 0 0 10px;
-    padding-bottom: 12px;
-    border-bottom: 1px solid var(--border);
-    color: var(--muted);
-    font-size: 0.78rem;
+  .hero-copy h1 {
+    font-size: 1.9rem;
     font-weight: 700;
-    text-transform: uppercase;
   }
 
-  .categories a {
-    display: grid;
-    gap: 4px;
-    padding-block: 14px;
-    border-bottom: 1px solid var(--border);
+  .hero-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 22px;
+  }
+
+  .hero-links a {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 7px 11px;
+    border: 1px solid var(--border);
+    border-radius: calc(var(--radius) - 2px);
+    color: var(--muted);
+    font-size: 0.84rem;
     text-decoration: none;
   }
 
-  .categories span {
-    font-weight: 650;
+  .hero-links a:hover {
+    color: var(--text);
+    border-color: var(--border-strong);
   }
 
-  .categories small {
-    color: var(--muted);
-    font-size: 0.78rem;
-    line-height: 1.5;
+  .home-section {
+    max-width: 720px;
+    margin-inline: auto;
   }
 
-  .home-tools {
+  .home-section + .home-section {
     margin-top: 82px;
   }
 
@@ -129,13 +133,15 @@ const articles = sortArticles(
   }
 
   @media (max-width: 800px) {
-    .intro {
+    .hero {
+      flex-direction: column;
+      gap: 24px;
       padding-bottom: 58px;
     }
 
-    .home-grid {
-      grid-template-columns: 1fr;
-      gap: 48px;
+    .hero-avatar {
+      width: 72px;
+      height: 72px;
     }
 
     .tool-grid {

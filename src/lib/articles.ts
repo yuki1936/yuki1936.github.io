@@ -45,3 +45,12 @@ export function formatDate(date: Date): string {
     day: "2-digit",
   }).format(date);
 }
+
+const cjkPattern = /[一-鿿぀-ヿ가-힯]/g;
+
+/** 中文约 300 字/分钟、拉丁文约 200 词/分钟，最低 1 分钟。 */
+export function readingMinutes(markdown: string): number {
+  const cjk = markdown.match(cjkPattern)?.length ?? 0;
+  const words = markdown.replace(cjkPattern, " ").match(/[A-Za-z0-9]+/g)?.length ?? 0;
+  return Math.max(1, Math.ceil(cjk / 300 + words / 200));
+}

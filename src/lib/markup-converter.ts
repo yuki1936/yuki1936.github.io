@@ -134,22 +134,22 @@ export function createPreviewDocument(content: string): string {
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data: blob:; font-src data:; style-src 'unsafe-inline'">
   <style>
-    :root { color-scheme: dark; }
-    body { margin: 0; padding: 24px; color: #d8dcd9; background: #0e110f; font: 15px/1.75 system-ui, sans-serif; }
-    h1, h2, h3, h4, h5, h6 { margin: 1.4em 0 .6em; color: #edf0ee; line-height: 1.3; }
+    :root { color-scheme: light; }
+    body { margin: 0; padding: 24px; color: #18181b; background: #ffffff; font: 15px/1.75 system-ui, sans-serif; }
+    h1, h2, h3, h4, h5, h6 { margin: 1.4em 0 .6em; color: #09090b; line-height: 1.3; }
     h1:first-child, h2:first-child, h3:first-child { margin-top: 0; }
     h1 { font-size: 1.65rem; } h2 { font-size: 1.35rem; } h3 { font-size: 1.15rem; }
     p, ul, ol, blockquote, pre, table { margin: 0 0 1em; }
-    a { color: #8fd3a9; pointer-events: none; } img { max-width: 100%; height: auto; }
-    blockquote { margin-left: 0; padding-left: 1em; border-left: 2px solid #405047; color: #a7afa9; }
-    aside.admonition { margin: 0 0 1em; padding: 12px 14px; border-left: 3px solid #b7954b; background: #151812; }
+    a { color: #18181b; pointer-events: none; } img { max-width: 100%; height: auto; }
+    blockquote { margin-left: 0; padding-left: 1em; border-left: 2px solid #d4d4d8; color: #52525b; }
+    aside.admonition { margin: 0 0 1em; padding: 12px 14px; border-left: 3px solid #71717a; background: #f4f4f5; }
     .admonition-title { display: block; margin-bottom: .4em; } details, figure { margin: 0 0 1em; }
-    summary { cursor: pointer; color: #edf0ee; } figcaption { margin-top: .5em; color: #a7afa9; text-align: center; }
-    mark { padding: 0 .18em; color: #10130f; background: #c8b86c; } kbd { padding: 1px 5px; border: 1px solid #526158; background: #171c19; }
-    .small-caps { font-variant: small-caps; } .page-break { margin: 1.5em 0; border-top: 1px dashed #526158; }
+    summary { cursor: pointer; color: #09090b; } figcaption { margin-top: .5em; color: #52525b; text-align: center; }
+    mark { padding: 0 .18em; color: #09090b; background: #d4d4d8; } kbd { padding: 1px 5px; border: 1px solid #a1a1aa; background: #f4f4f5; }
+    .small-caps { font-variant: small-caps; } .page-break { margin: 1.5em 0; border-top: 1px dashed #a1a1aa; }
     code, pre { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
-    code { color: #d7e9dc; } pre { overflow: auto; padding: 12px; background: #151a17; }
-    table { width: 100%; border-collapse: collapse; } th, td { padding: 7px 9px; border: 1px solid #303a34; text-align: left; }
+    code { color: #09090b; } pre { overflow: auto; padding: 12px; background: #f4f4f5; }
+    table { width: 100%; border-collapse: collapse; } th, td { padding: 7px 9px; border: 1px solid #e4e4e7; text-align: left; }
   </style>
 </head>
 <body>${content}</body>

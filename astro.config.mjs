@@ -23,7 +23,12 @@ export default defineConfig({
     sitemap({
       filter: (page) => {
         const pathname = normalizePath(new URL(page).pathname);
-        return pathname !== "/404" && pathname !== "/404.html" && !legacyPaths.has(pathname);
+        return (
+          pathname !== "/404" &&
+          pathname !== "/404.html" &&
+          pathname !== "/rss.xml" &&
+          !legacyPaths.has(pathname)
+        );
       },
     }),
   ],
