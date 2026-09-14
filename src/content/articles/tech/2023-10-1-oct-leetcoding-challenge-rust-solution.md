@@ -1,5 +1,6 @@
 ---
 title: Oct LeetCoding Challenge Rust Solution
+description: 2023 年 10 月 LeetCoding Challenge 的 Rust 题解合集。
 published: 2023-10-01
 draft: false
 ---

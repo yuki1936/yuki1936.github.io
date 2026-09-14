@@ -9,7 +9,7 @@ draft: false
 
 一开始我以为这只是给几个现成的 parser 和 renderer 接一层接口。真正开始写以后，麻烦的地方并不是“怎么把标题变成 `#` 或 `\section`”，而是这四种语言能表达的东西并不一样。Markdown 比较克制，HTML 什么都能塞，Typst 和 LaTeX 又各自带有可编程能力。所谓“互相转换”，稍不注意就会变成一堆只对示例有效的字符串替换。
 
-最后做出来的东西叫 [markweft-rs](https://github.com/yuki1936/markweft-rs)。它现在既可以作为 Rust 库和 CLI 使用，也能编译成 WebAssembly，跑在博客的工具页面里。
+最后做出来的东西叫 [markweft-rs](https://github.com/yuki1936/markweft-rs)。它现在既可以作为 Rust 库和 CLI 使用，也能编译成 WebAssembly，跑在博客的[工具页面](/tools/markup-converter/)里。
 
 ## 先把转换路径收起来
 

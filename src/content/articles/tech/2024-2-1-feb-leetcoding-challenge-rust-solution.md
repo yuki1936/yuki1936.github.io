@@ -1,5 +1,6 @@
 ---
 title: Feb LeetCoding Challenge Rust Solution
+description: 2024 年 2 月 LeetCoding Challenge 的 Rust 题解合集。
 published: 2024-02-01
 draft: false
 ---

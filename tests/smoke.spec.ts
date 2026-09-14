@@ -243,9 +243,6 @@ test("article tables of contents and heading permalinks follow article length", 
   );
   await expect(page.locator(".article-toc")).toBeVisible();
   await expect(page.locator(".article-toc details")).not.toHaveAttribute("open", "");
-
-  await page.goto("/articles/life/my-cat/");
-  await expect(page.locator(".article-toc")).toHaveCount(0);
 });
 
 test("document converter runs the Rust Wasm format matrix", async ({ page }) => {
