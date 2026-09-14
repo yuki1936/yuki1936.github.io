@@ -7,7 +7,7 @@ draft: false
 
 我做了一个按角色分类的表情包分享网站。它可以浏览、复制和下载图片，也提供了一个简单的表情包生成器。
 
-- 网站：[表情包分享](https://amm-meme-share.pages.dev/)
+- 在线预览：[amm.yuki1936.com](https://amm.yuki1936.com/)
 - 源码：[yuki1936/amm-meme-share](https://github.com/yuki1936/amm-meme-share)
 
 ## 为什么做这个网站
