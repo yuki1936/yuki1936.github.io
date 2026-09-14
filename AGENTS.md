@@ -3,8 +3,9 @@
 ## Project
 
 This is a statically generated personal blog and browser-tool site built with
-Astro, TypeScript, Markdown/MDX, and plain CSS. GitHub Pages hosts the generated
-site. Keep all production behavior compatible with Astro's static output.
+Astro, TypeScript, Markdown/MDX, and plain CSS. Cloudflare Pages hosts the
+generated site at https://yuki1936.com. Keep all production behavior compatible
+with Astro's static output.
 
 ## Commands
 

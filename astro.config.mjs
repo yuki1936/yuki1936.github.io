@@ -16,7 +16,7 @@ function normalizePath(pathname) {
 }
 
 export default defineConfig({
-  site: "https://yuki1936.github.io",
+  site: "https://yuki1936.com",
   output: "static",
   redirects,
   integrations: [

@@ -34,13 +34,13 @@ test("sitemap exposes canonical routes and excludes legacy redirects", async ({ 
   const homeResponse = await request.get("/");
   expect(homeResponse.ok()).toBe(true);
   await expect(homeResponse.text()).resolves.toContain(
-    '<link rel="canonical" href="https://yuki1936.github.io/">',
+    '<link rel="canonical" href="https://yuki1936.com/">',
   );
 
   const indexResponse = await request.get("/sitemap-index.xml");
   expect(indexResponse.ok()).toBe(true);
   await expect(indexResponse.text()).resolves.toContain(
-    "https://yuki1936.github.io/sitemap-0.xml",
+    "https://yuki1936.com/sitemap-0.xml",
   );
 
   const sitemapResponse = await request.get("/sitemap-0.xml");
@@ -55,17 +55,17 @@ test("sitemap exposes canonical routes and excludes legacy redirects", async ({ 
     "/tools/blurhash-tool/",
     "/tools/markup-converter/",
   ]) {
-    expect(sitemap).toContain(`https://yuki1936.github.io${canonicalPath}`);
+    expect(sitemap).toContain(`https://yuki1936.com${canonicalPath}`);
   }
   for (const legacyPath of Object.keys(toolRedirects)) {
-    expect(sitemap).not.toContain(`https://yuki1936.github.io${legacyPath}`);
+    expect(sitemap).not.toContain(`https://yuki1936.com${legacyPath}`);
   }
-  expect(sitemap).not.toContain("https://yuki1936.github.io/404");
+  expect(sitemap).not.toContain("https://yuki1936.com/404");
 
   const robotsResponse = await request.get("/robots.txt");
   expect(robotsResponse.ok()).toBe(true);
   await expect(robotsResponse.text()).resolves.toContain(
-    "Sitemap: https://yuki1936.github.io/sitemap-index.xml",
+    "Sitemap: https://yuki1936.com/sitemap-index.xml",
   );
 });
 
