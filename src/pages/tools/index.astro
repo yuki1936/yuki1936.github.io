@@ -1,5 +1,15 @@
 ---
-import { Braces, FileOutput, Image as ImageIcon, Network, ScanLine } from "@lucide/astro";
+import {
+  Braces,
+  Clock,
+  FileOutput,
+  Hash,
+  Image as ImageIcon,
+  KeyRound,
+  Network,
+  Router,
+  ScanLine,
+} from "@lucide/astro";
 import ToolLink from "../../components/ToolLink.astro";
 import BaseLayout from "../../layouts/BaseLayout.astro";
 ---
@@ -38,6 +48,30 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
       title="标记语言转换"
       description="在 Markdown、HTML、Typst 与 LaTeX 之间转换。"
       icon={FileOutput}
+    />
+    <ToolLink
+      href="/tools/hash-calculator/"
+      title="哈希计算器"
+      description="计算文本或文件的 SHA-1/256/384/512 摘要。"
+      icon={Hash}
+    />
+    <ToolLink
+      href="/tools/codec/"
+      title="编解码工具"
+      description="Base64、URL 编解码与 JWT 结构解析。"
+      icon={KeyRound}
+    />
+    <ToolLink
+      href="/tools/cidr/"
+      title="CIDR 子网计算器"
+      description="计算 IPv4 网络地址、掩码与可用主机范围。"
+      icon={Router}
+    />
+    <ToolLink
+      href="/tools/timestamp-cron/"
+      title="时间戳与 Cron"
+      description="时间戳互转与 Cron 表达式中文释义。"
+      icon={Clock}
     />
   </div>
 </BaseLayout>

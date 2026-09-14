@@ -58,9 +58,14 @@ The canonical tool routes are:
 - `/tools/image-processor/`
 - `/tools/blurhash-tool/`
 - `/tools/markup-converter/`
+- `/tools/hash-calculator/`
+- `/tools/codec/`
+- `/tools/cidr/`
+- `/tools/timestamp-cron/`
 
-Other public routes: `/articles/`, `/links/` (friend links, data in
-`src/lib/friend-links.ts`), `/about/`, and `/rss.xml` (feed via `@astrojs/rss`).
+Other public routes: `/articles/`, `/archives/`, `/links/` (friend links, data
+in `src/lib/friend-links.ts`), `/about/`, `/search/` (Pagefind, excluded from
+the sitemap), and `/rss.xml` (full-text feed via `@astrojs/rss`).
 
 Keep internal links and Playwright navigation on these canonical routes. When a
 public route is renamed, retain its previous path in `astro.config.mjs` as a

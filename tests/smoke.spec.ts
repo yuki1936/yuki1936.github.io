@@ -12,7 +12,13 @@ const pages = [
   "/tools/image-processor/",
   "/tools/blurhash-tool/",
   "/tools/markup-converter/",
+  "/tools/hash-calculator/",
+  "/tools/codec/",
+  "/tools/cidr/",
+  "/tools/timestamp-cron/",
   "/links/",
+  "/archives/",
+  "/search/",
   "/about/",
 ];
 
@@ -379,6 +385,70 @@ test("prefers-color-scheme dark applies dark before first paint", async ({ page 
   await expect(page.locator("html")).toHaveClass(/dark/);
   await expect(page.locator("body")).toHaveCSS("background-color", "rgb(9, 9, 11)");
   expect(await page.evaluate(() => localStorage.getItem("theme"))).toBeNull();
+});
+
+test("hash calculator digests text locally", async ({ page }) => {
+  await page.goto("/tools/hash-calculator/");
+  await page.locator("#hash-text").fill("abc");
+  await expect(page.locator("#hash-status")).toHaveText("文本的哈希已就绪", { timeout: 10_000 });
+  await expect(page.locator("#hash-results")).toContainText("ba7816bf8f01cfea414140de5dae2223");
+  await expect(page.locator("#hash-results")).toContainText("a9993e364706816aba3e25717850c26c9cd0d89d");
+});
+
+test("codec tool encodes base64 and decodes jwt", async ({ page }) => {
+  await page.goto("/tools/codec/");
+  await page.locator("#b64-input").fill("hello");
+  await page.getByRole("button", { name: "编码", exact: true }).first().click();
+  await expect(page.locator("#codec-output")).toHaveValue("aGVsbG8=");
+
+  await page.locator("#jwt-input").fill(
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIn0.ignored",
+  );
+  await page.getByRole("button", { name: "解析" }).click();
+  await expect(page.locator("#codec-output")).toHaveValue(/HS256/);
+});
+
+test("cidr calculator computes a classic /24", async ({ page }) => {
+  await page.goto("/tools/cidr/");
+  await page.locator("#cidr-input").fill("192.168.1.10/24");
+  await page.getByRole("button", { name: "计算" }).click();
+  await expect(page.locator("#cidr-results")).toContainText("192.168.1.0");
+  await expect(page.locator("#cidr-results")).toContainText("255.255.255.0");
+  await expect(page.locator("#cidr-results")).toContainText("254");
+
+  await page.locator("#cidr-input").fill("192.168.1.1/40");
+  await page.getByRole("button", { name: "计算" }).click();
+  await expect(page.locator("#cidr-status")).toHaveAttribute("data-state", "error");
+});
+
+test("timestamp and cron tool answers queries", async ({ page }) => {
+  await page.goto("/tools/timestamp-cron/");
+  await expect(page.locator("#now-ts")).not.toHaveText("-");
+  await page.locator("#ts-input").fill("1757894400");
+  await expect(page.locator(".ts-row")).toHaveCount(3);
+  await expect(page.locator(".ts-row").nth(1)).toContainText("2025-09-15");
+
+  await page.locator("#cron-input").fill("*/5 * * * *");
+  await page.getByRole("button", { name: "解析" }).click();
+  await expect(page.locator("#cron-status")).toContainText("每 5 分钟");
+
+  await page.locator("#cron-input").fill("bad expression");
+  await page.getByRole("button", { name: "解析" }).click();
+  await expect(page.locator("#cron-status")).toHaveAttribute("data-state", "error");
+});
+
+test("search finds matching pages", async ({ page }) => {
+  await page.goto("/search/");
+  await page.locator("#search-input").fill("markweft");
+  await expect(page.locator("#search-status")).toContainText(/\d+ 条结果/, { timeout: 15_000 });
+  await expect(page.locator('.search-row[href*="building-markweft-rs"]')).toBeVisible();
+});
+
+test("archives lists every published article by year", async ({ page }) => {
+  await page.goto("/archives/");
+  await expect(page.locator(".year-section h2").first()).toHaveText(/20\d{2}/);
+  const count = await page.locator(".year-list a").count();
+  expect(count).toBeGreaterThanOrEqual(7);
 });
 
 test("visual snapshots", async ({ page }) => {

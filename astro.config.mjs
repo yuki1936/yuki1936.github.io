@@ -27,6 +27,8 @@ export default defineConfig({
           pathname !== "/404" &&
           pathname !== "/404.html" &&
           pathname !== "/rss.xml" &&
+          pathname !== "/search" &&
+          pathname !== "/search/" &&
           !legacyPaths.has(pathname)
         );
       },
